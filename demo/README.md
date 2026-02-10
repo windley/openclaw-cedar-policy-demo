@@ -150,7 +150,8 @@ Results: 6 passed, 0 failed
 Copy the sample config:
 
 ```bash
-cp openclaw.json5 ~/.openclaw/config.json5
+mkdir -p ~/.openclaw
+cp openclaw.json5 ~/.openclaw/openclaw.json
 ```
 
 Or merge the `authz` section into your existing config:
