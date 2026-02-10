@@ -58,6 +58,9 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
    # Install Rust/Cargo if not already installed
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
+   # Add Cargo to PATH (or restart your shell)
+   source $HOME/.cargo/env
+
    # Install Cedar CLI
    cargo install cedar-policy-cli
    ```
