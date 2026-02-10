@@ -10,6 +10,20 @@ When authorization is enabled, every tool execution request is intercepted and e
 - ❌ **Deny** dangerous operations (write to `/etc`, run `rm -rf`, read SSH keys)
 - 🤖 **Agent replans** when denied, explaining limitations and suggesting alternatives
 
+## Demo Video
+
+Watch a complete walkthrough of the Cedar authorization demo:
+
+[![Cedar Authorization Demo](https://img.youtube.com/vi/i0kZNBYZ5no/maxresdefault.jpg)](https://youtu.be/i0kZNBYZ5no)
+
+**[▶️ Watch on YouTube: Cedar Authorization Demo for OpenClaw](https://youtu.be/i0kZNBYZ5no)** (10 minutes)
+
+The video demonstrates:
+- Setting up the Cedar PDP server
+- Running authorization tests
+- Live agent examples showing both allowed and denied operations
+- How the agent responds to authorization denials
+
 ## Architecture
 
 The Cedar authorization system integrates into OpenClaw's agent execution loop, adding a Policy Enforcement Point (PEP) that checks with an external Policy Decision Point (PDP) before allowing tool execution.
