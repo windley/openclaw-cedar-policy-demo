@@ -71,3 +71,13 @@ USER.md
 
 # local tooling
 .serena/
+
+# Python artifacts
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/

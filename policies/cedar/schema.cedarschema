@@ -1,0 +1,107 @@
+// Cedar Schema for OpenClaw Tool Authorization
+// This schema defines the entity types, actions, and context used for authorizing
+// agent tool executions via the Cedar Policy Decision Point (PDP).
+
+namespace OpenClaw {
+  //
+  // Entity Types
+  //
+
+  // Agent represents an OpenClaw agent instance.
+  // Each agent has a unique identifier (agentId or sessionKey).
+  entity Agent = {
+    // Optional: agent role (e.g., "developer", "operator", "auditor")
+    "role"?: String,
+    // Optional: security level (e.g., "low", "medium", "high")
+    "securityLevel"?: String,
+  };
+
+  // Tool represents an executable tool in the OpenClaw system.
+  // Tools are the resources being protected by authorization policies.
+  entity Tool = {
+    // Tool category (e.g., "file_operation", "shell", "network")
+    "category"?: String,
+    // Risk level (e.g., "low", "medium", "high", "critical")
+    "riskLevel"?: String,
+  };
+
+  //
+  // Actions
+  //
+
+  // ToolExec namespace contains all tool execution actions.
+  // Each tool type has a corresponding action (e.g., ToolExec::Bash, ToolExec::Read).
+  action "ToolExec::Bash" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Read" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Write" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Edit" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Exec" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Process" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Glob" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::Grep" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  action "ToolExec::ApplyPatch" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
+  //
+  // Context Schema
+  //
+
+  // ToolContext provides runtime information about the tool execution request.
+  // This context can be used in policy conditions to make fine-grained authorization decisions.
+  type ToolContext = {
+    // Tool call identifier (from LLM)
+    "toolCallId": String,
+
+    // Session key (agent session identifier)
+    "sessionKey"?: String,
+
+    // File path (for file operation tools: read, write, edit) - provide empty string if N/A
+    "filePath": String,
+
+    // Command string (for exec/bash tools) - provide empty string if N/A
+    "command": String,
+  };
+}

@@ -1,0 +1,11 @@
+{
+  "principal": "OpenClaw::Agent::\"agent-abc123\"",
+  "action": "OpenClaw::Action::\"ToolExec::Read\"",
+  "resource": "OpenClaw::Tool::\"read\"",
+  "context": {
+    "toolCallId": "toolu_001",
+    "filePath": "/home/user/code/main.py",
+    "command": "",
+    "sessionKey": "session-123"
+  }
+}

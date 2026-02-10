@@ -1,0 +1,123 @@
+[
+  {
+    "uid": {
+      "type": "OpenClaw::Agent",
+      "id": "agent-abc123"
+    },
+    "attrs": {
+      "role": "developer",
+      "securityLevel": "medium"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Agent",
+      "id": "agent-xyz789"
+    },
+    "attrs": {
+      "role": "operator",
+      "securityLevel": "low"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "bash"
+    },
+    "attrs": {
+      "category": "shell",
+      "riskLevel": "high"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "exec"
+    },
+    "attrs": {
+      "category": "shell",
+      "riskLevel": "high"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "read"
+    },
+    "attrs": {
+      "category": "file_operation",
+      "riskLevel": "low"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "write"
+    },
+    "attrs": {
+      "category": "file_operation",
+      "riskLevel": "medium"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "edit"
+    },
+    "attrs": {
+      "category": "file_operation",
+      "riskLevel": "medium"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "glob"
+    },
+    "attrs": {
+      "category": "file_operation",
+      "riskLevel": "low"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "grep"
+    },
+    "attrs": {
+      "category": "file_operation",
+      "riskLevel": "low"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "process"
+    },
+    "attrs": {
+      "category": "system",
+      "riskLevel": "high"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "apply_patch"
+    },
+    "attrs": {
+      "category": "file_operation",
+      "riskLevel": "medium"
+    },
+    "parents": []
+  }
+]

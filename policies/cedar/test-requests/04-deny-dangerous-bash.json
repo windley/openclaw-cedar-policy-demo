@@ -1,0 +1,11 @@
+{
+  "principal": "OpenClaw::Agent::\"agent-abc123\"",
+  "action": "OpenClaw::Action::\"ToolExec::Bash\"",
+  "resource": "OpenClaw::Tool::\"bash\"",
+  "context": {
+    "toolCallId": "toolu_004",
+    "filePath": "",
+    "command": "rm -rf /",
+    "sessionKey": "session-123"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "principal": "OpenClaw::Agent::\"agent-abc123\"",
+  "action": "OpenClaw::Action::\"ToolExec::Bash\"",
+  "resource": "OpenClaw::Tool::\"bash\"",
+  "context": {
+    "toolCallId": "toolu_005",
+    "filePath": "",
+    "command": "git status",
+    "sessionKey": "session-123"
+  }
+}

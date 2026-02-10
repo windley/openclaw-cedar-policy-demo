@@ -1,0 +1,22 @@
+// OpenClaw Configuration with Cedar Authorization
+// This config enables the Cedar PDP for tool authorization
+{
+  // Cedar Policy Decision Point (PDP) configuration
+  authz: {
+    pdp: {
+      // Enable authorization checks before tool execution
+      enabled: true,
+
+      // PDP endpoint URL (cedar-pdp-server.py)
+      endpoint: "http://localhost:8180/authorize",
+
+      // Request timeout in milliseconds
+      timeoutMs: 2000,
+
+      // Fail-open vs fail-closed behavior
+      // false = fail-closed (deny on PDP errors) - RECOMMENDED for security
+      // true = fail-open (allow on PDP errors) - use only for testing
+      failOpen: false
+    }
+  }
+}

@@ -206,6 +206,20 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    authz: z
+      .object({
+        pdp: z
+          .object({
+            enabled: z.boolean().optional(),
+            endpoint: z.string().optional(),
+            timeoutMs: z.number().int().positive().optional(),
+            failOpen: z.boolean().optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
     models: ModelsConfigSchema,
     nodeHost: NodeHostSchema,
     agents: AgentsSchema,

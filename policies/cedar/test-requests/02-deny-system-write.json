@@ -1,0 +1,11 @@
+{
+  "principal": "OpenClaw::Agent::\"agent-abc123\"",
+  "action": "OpenClaw::Action::\"ToolExec::Write\"",
+  "resource": "OpenClaw::Tool::\"write\"",
+  "context": {
+    "toolCallId": "toolu_002",
+    "filePath": "/etc/passwd",
+    "command": "",
+    "sessionKey": "session-123"
+  }
+}
