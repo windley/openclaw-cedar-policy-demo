@@ -86,7 +86,7 @@ export type AuthzDecision = {
 function buildPrincipal(ctx: ToolAuthzContext): string {
   // Use agentId if available, otherwise use sessionKey, otherwise use "unknown"
   const identifier = ctx.agentId || ctx.sessionKey || "unknown";
-  return `Agent::"${identifier}"`;
+  return `OpenClaw::Agent::"${identifier}"`;
 }
 
 /**
@@ -98,14 +98,14 @@ function buildAction(toolName: string): string {
     .split(/[-_]/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("");
-  return `Action::"ToolExec::${normalized}"`;
+  return `OpenClaw::Action::"ToolExec::${normalized}"`;
 }
 
 /**
  * Build a Cedar resource identifier from tool name.
  */
 function buildResource(toolName: string): string {
-  return `Tool::"${toolName}"`;
+  return `OpenClaw::Tool::"${toolName}"`;
 }
 
 /**
