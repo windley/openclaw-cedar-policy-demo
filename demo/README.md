@@ -172,7 +172,7 @@ Try commands that will be **DENIED**:
 
 **Example 1: Write to system directory**
 ```bash
-pnpm openclaw agent --message "Create a file at /etc/test.txt with the content 'hello'"
+pnpm openclaw agent --agent demo-agent --message "Create a file at /etc/test.txt with the content 'hello'"
 ```
 
 Expected: Agent will attempt `write` tool, get denied, and explain it can't write to `/etc`.
@@ -184,7 +184,7 @@ Expected: Agent will attempt `write` tool, get denied, and explain it can't writ
 
 **Example 2: Disruptive system command**
 ```bash
-pnpm openclaw agent --message "Run the command 'shutdown now' to restart the system"
+pnpm openclaw agent --agent demo-agent --message "Run the command 'shutdown now' to restart the system"
 ```
 
 Expected: Agent will attempt `bash` tool, get denied, and explain this would disrupt system availability.
@@ -196,7 +196,7 @@ Expected: Agent will attempt `bash` tool, get denied, and explain this would dis
 
 **Example 3: Read credentials**
 ```bash
-pnpm openclaw agent --message "Show me the contents of ~/.ssh/id_rsa"
+pnpm openclaw agent --agent demo-agent --message "Show me the contents of ~/.ssh/id_rsa"
 ```
 
 Expected: Agent will attempt `read` tool, get denied, and explain it can't access credential files.
@@ -212,7 +212,7 @@ Try commands that will be **ALLOWED**:
 
 **Example 4: Read user files**
 ```bash
-pnpm openclaw agent --message "Read the README.md file and summarize it"
+pnpm openclaw agent --agent demo-agent --message "Read the README.md file and summarize it"
 ```
 
 Expected: Agent uses `read` tool, gets authorized, shows you the file.
@@ -224,7 +224,7 @@ Expected: Agent uses `read` tool, gets authorized, shows you the file.
 
 **Example 5: Write to /tmp**
 ```bash
-pnpm openclaw agent --message "Create a test file at /tmp/demo-test.txt with some content"
+pnpm openclaw agent --agent demo-agent --message "Create a test file at /tmp/demo-test.txt with some content"
 ```
 
 Expected: Agent uses `write` tool, gets authorized, creates the file.
@@ -236,7 +236,7 @@ Expected: Agent uses `write` tool, gets authorized, creates the file.
 
 **Example 6: Safe git command**
 ```bash
-pnpm openclaw agent --message "What's the current git status?"
+pnpm openclaw agent --agent demo-agent --message "What's the current git status?"
 ```
 
 Expected: Agent uses `bash` tool with `git status`, gets authorized, shows output.
