@@ -53,7 +53,18 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
 
 ### Prerequisites
 
-1. **Cedar CLI:**
+1. **Anthropic API Key:**
+   ```bash
+   # Set your Anthropic API key as an environment variable
+   export ANTHROPIC_API_KEY=your-api-key-here
+
+   # Or add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+   echo 'export ANTHROPIC_API_KEY=your-api-key-here' >> ~/.zshrc
+   ```
+
+   Get your API key from: https://console.anthropic.com/
+
+2. **Cedar CLI:**
    ```bash
    # Install Rust/Cargo if not already installed
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -65,12 +76,12 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
    cargo install cedar-policy-cli
    ```
 
-2. **Node.js and pnpm:**
+3. **Node.js and pnpm:**
    ```bash
    npm install -g pnpm
    ```
 
-3. **Python requests:**
+4. **Python requests:**
    ```bash
    pip3 install requests
    ```
