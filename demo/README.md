@@ -28,133 +28,6 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
    - **Permit**: Tool executes normally, result flows back to agent
    - **Deny**: Execution blocked, agent receives denial reason and can replan
 
-### Implementation Changes
-
-The authorization system required minimal changes to OpenClaw:
-
-#### 1. Policy Decision Point Client (`src/authz/cedar-pdp-client.ts`)
-
-**New file** that provides an HTTP client for calling the Cedar PDP:
-
-```typescript
-export async function authorizeTool(
-  ctx: ToolAuthzContext,
-  config: CedarPdpConfig,
-): Promise<AuthzDecision>
-```
-
-**Key responsibilities:**
-- Builds Cedar-compatible authorization requests
-- Calls PDP via HTTP POST to `/authorize`
-- Handles timeouts and fail-open/fail-closed behavior
-- Returns structured decision with allow/deny and reason
-
-#### 2. Configuration Types (`src/config/types.authz.ts`)
-
-**New file** defining the authorization configuration schema:
-
-```typescript
-export type AuthzConfig = {
-  pdp?: {
-    enabled?: boolean;
-    endpoint?: string;
-    timeoutMs?: number;
-    failOpen?: boolean;
-  };
-};
-```
-
-Added to main config in `src/config/types.openclaw.ts`:
-```typescript
-export type OpenClawConfig = {
-  // ... existing config
-  authz?: AuthzConfig;
-};
-```
-
-#### 3. Configuration Schema (`src/config/zod-schema.ts`)
-
-**Modified** to add Zod validation for authorization config:
-
-```typescript
-authz: z.object({
-  pdp: z.object({
-    enabled: z.boolean().optional(),
-    endpoint: z.string().optional(),
-    timeoutMs: z.number().int().positive().optional(),
-    failOpen: z.boolean().optional(),
-  }).strict().optional(),
-}).strict().optional(),
-```
-
-#### 4. Policy Enforcement Point (`src/agents/pi-tools.before-tool-call.ts`)
-
-**Modified** to add PEP logic in the existing tool wrapper:
-
-```typescript
-export async function runBeforeToolCallHook(args: {
-  toolName: string;
-  params: unknown;
-  toolCallId?: string;
-  ctx?: HookContext;
-}): Promise<HookResult> {
-  // Check if PDP is enabled
-  const pdpConfig = args.ctx?.config?.authz?.pdp;
-  if (pdpConfig?.enabled && pdpConfig.endpoint) {
-    // Call PDP
-    const decision = await authorizeTool({
-      toolName: args.toolName,
-      params: isPlainObject(args.params) ? args.params : {},
-      toolCallId: args.toolCallId,
-      agentId: args.ctx?.agentId,
-      sessionKey: args.ctx?.sessionKey,
-    }, {
-      endpoint: pdpConfig.endpoint,
-      timeoutMs: pdpConfig.timeoutMs,
-      failOpen: pdpConfig.failOpen,
-    });
-
-    // Enforce decision
-    if (!decision.allowed) {
-      return { blocked: true, reason: decision.reason || "..." };
-    }
-  }
-
-  // Continue with normal execution
-  return { blocked: false };
-}
-```
-
-**Key points:**
-- Hooks into existing `wrapToolWithBeforeToolCallHook()` mechanism
-- Only runs when `authz.pdp.enabled: true` in config
-- Blocks tool execution and returns denial reason if denied
-- Zero impact when authorization is disabled
-
-#### 5. Tool Wrapper Integration (`src/agents/pi-tools.ts`)
-
-**Modified** to pass config to tool hooks:
-
-```typescript
-const withHooks = normalized.map((tool) =>
-  wrapToolWithBeforeToolCallHook(tool, {
-    agentId,
-    sessionKey: options?.sessionKey,
-    config: options?.config,  // ← Added this line
-  }),
-);
-```
-
-### Design Principles
-
-The implementation follows these principles:
-
-1. **Minimal invasiveness**: Only ~200 lines of new code, leveraging existing hook mechanism
-2. **Fail-safe defaults**: Authorization disabled by default, fail-closed by default
-3. **Zero performance impact when disabled**: No overhead if `enabled: false`
-4. **Pluggable architecture**: PDP is external, can be replaced with any Cedar-compatible service
-5. **Clear separation**: Authorization logic isolated in `src/authz/`, doesn't pollute core agent code
-
 ## Quick Start
 
 ### Prerequisites
@@ -347,6 +220,133 @@ The notebook includes:
 - Live PDP server testing
 - Authorization examples with detailed descriptions
 - Security warnings and best practices
+
+## Implementation Details
+
+The authorization system required minimal changes to OpenClaw:
+
+### 1. Policy Decision Point Client (`src/authz/cedar-pdp-client.ts`)
+
+**New file** that provides an HTTP client for calling the Cedar PDP:
+
+```typescript
+export async function authorizeTool(
+  ctx: ToolAuthzContext,
+  config: CedarPdpConfig,
+): Promise<AuthzDecision>
+```
+
+**Key responsibilities:**
+- Builds Cedar-compatible authorization requests
+- Calls PDP via HTTP POST to `/authorize`
+- Handles timeouts and fail-open/fail-closed behavior
+- Returns structured decision with allow/deny and reason
+
+### 2. Configuration Types (`src/config/types.authz.ts`)
+
+**New file** defining the authorization configuration schema:
+
+```typescript
+export type AuthzConfig = {
+  pdp?: {
+    enabled?: boolean;
+    endpoint?: string;
+    timeoutMs?: number;
+    failOpen?: boolean;
+  };
+};
+```
+
+Added to main config in `src/config/types.openclaw.ts`:
+```typescript
+export type OpenClawConfig = {
+  // ... existing config
+  authz?: AuthzConfig;
+};
+```
+
+### 3. Configuration Schema (`src/config/zod-schema.ts`)
+
+**Modified** to add Zod validation for authorization config:
+
+```typescript
+authz: z.object({
+  pdp: z.object({
+    enabled: z.boolean().optional(),
+    endpoint: z.string().optional(),
+    timeoutMs: z.number().int().positive().optional(),
+    failOpen: z.boolean().optional(),
+  }).strict().optional(),
+}).strict().optional(),
+```
+
+### 4. Policy Enforcement Point (`src/agents/pi-tools.before-tool-call.ts`)
+
+**Modified** to add PEP logic in the existing tool wrapper:
+
+```typescript
+export async function runBeforeToolCallHook(args: {
+  toolName: string;
+  params: unknown;
+  toolCallId?: string;
+  ctx?: HookContext;
+}): Promise<HookResult> {
+  // Check if PDP is enabled
+  const pdpConfig = args.ctx?.config?.authz?.pdp;
+  if (pdpConfig?.enabled && pdpConfig.endpoint) {
+    // Call PDP
+    const decision = await authorizeTool({
+      toolName: args.toolName,
+      params: isPlainObject(args.params) ? args.params : {},
+      toolCallId: args.toolCallId,
+      agentId: args.ctx?.agentId,
+      sessionKey: args.ctx?.sessionKey,
+    }, {
+      endpoint: pdpConfig.endpoint,
+      timeoutMs: pdpConfig.timeoutMs,
+      failOpen: pdpConfig.failOpen,
+    });
+
+    // Enforce decision
+    if (!decision.allowed) {
+      return { blocked: true, reason: decision.reason || "..." };
+    }
+  }
+
+  // Continue with normal execution
+  return { blocked: false };
+}
+```
+
+**Key points:**
+- Hooks into existing `wrapToolWithBeforeToolCallHook()` mechanism
+- Only runs when `authz.pdp.enabled: true` in config
+- Blocks tool execution and returns denial reason if denied
+- Zero impact when authorization is disabled
+
+### 5. Tool Wrapper Integration (`src/agents/pi-tools.ts`)
+
+**Modified** to pass config to tool hooks:
+
+```typescript
+const withHooks = normalized.map((tool) =>
+  wrapToolWithBeforeToolCallHook(tool, {
+    agentId,
+    sessionKey: options?.sessionKey,
+    config: options?.config,  // ← Added this line
+  }),
+);
+```
+
+### Design Principles
+
+The implementation follows these principles:
+
+1. **Minimal invasiveness**: Only ~200 lines of new code, leveraging existing hook mechanism
+2. **Fail-safe defaults**: Authorization disabled by default, fail-closed by default
+3. **Zero performance impact when disabled**: No overhead if `enabled: false`
+4. **Pluggable architecture**: PDP is external, can be replaced with any Cedar-compatible service
+5. **Clear separation**: Authorization logic isolated in `src/authz/`, doesn't pollute core agent code
 
 ## Demo Materials
 
