@@ -1,6 +1,14 @@
-# Cedar Authorization Demo Scripts
+# Cedar Authorization Demo for OpenClaw
 
-This directory contains standalone demo scripts for the Cedar authorization integration.
+This demo shows how to add fine-grained authorization controls to OpenClaw agent tool executions using [Cedar Policy Language](https://www.cedarpolicy.com/).
+
+## What This Demo Shows
+
+When authorization is enabled, every tool execution request is intercepted and evaluated against Cedar policies **before** the tool runs:
+
+- ✅ **Allow** safe operations (read user files, write to `/tmp`, run `git status`)
+- ❌ **Deny** dangerous operations (write to `/etc`, run `rm -rf`, read SSH keys)
+- 🤖 **Agent replans** when denied, explaining limitations and suggesting alternatives
 
 ## Architecture
 
@@ -147,28 +155,34 @@ The implementation follows these principles:
 4. **Pluggable architecture**: PDP is external, can be replaced with any Cedar-compatible service
 5. **Clear separation**: Authorization logic isolated in `src/authz/`, doesn't pollute core agent code
 
-## Scripts
+## Quick Start
 
-### `cedar-pdp-server.py`
+### Prerequisites
 
-Simple HTTP server that wraps the Cedar CLI to provide a Policy Decision Point (PDP) API.
+1. **Cedar CLI:**
+   ```bash
+   brew install cedar
+   ```
 
-**Features:**
-- HTTP POST `/authorize` - Authorization requests
-- HTTP GET `/health` - Health check
-- Validates schema and policies on startup
-- Returns JSON responses compatible with OpenClaw PEP client
+2. **Node.js and pnpm:**
+   ```bash
+   npm install -g pnpm
+   ```
 
-**Usage:**
+3. **Python requests:**
+   ```bash
+   pip3 install requests
+   ```
+
+### Step 1: Start PDP Server
+
+In a dedicated terminal:
+
 ```bash
-# Start the server
-python demo/cedar-pdp-server.py
-
-# Or make it executable and run directly
-./demo/cedar-pdp-server.py
+python3 demo/cedar-pdp-server.py
 ```
 
-**Output:**
+You should see:
 ```
 ============================================================
 Cedar PDP Server for OpenClaw Authorization
@@ -186,25 +200,17 @@ Ready to authorize tool executions...
 ============================================================
 ```
 
-### `test-pdp.py`
+Keep this terminal open to watch authorization decisions in real-time.
 
-Test client that sends sample authorization requests to the PDP server.
+### Step 2: Test the PDP Server
 
-**Features:**
-- 6 test scenarios (3 Allow, 3 Deny)
-- Verifies PDP server is running
-- Color-coded pass/fail results
+In another terminal, run the test client:
 
-**Usage:**
 ```bash
-# Make sure PDP server is running first!
-python demo/test-pdp.py
-
-# Or make it executable and run directly
-./demo/test-pdp.py
+python3 demo/test-pdp.py
 ```
 
-**Output:**
+You should see 6 tests pass:
 ```
 ======================================================================
 Cedar PDP Authorization Tests
@@ -220,50 +226,23 @@ Test 2: Deny: Write to /etc/passwd
   Decision: Deny
   ✓ PASS
 
-...
+... (4 more tests)
 
 ======================================================================
 Results: 6 passed, 0 failed
 ======================================================================
 ```
 
-## Quick Start
+### Step 3: Configure OpenClaw
 
-### Terminal 1: Start PDP Server
-
-```bash
-python demo/cedar-pdp-server.py
-```
-
-### Terminal 2: Run Tests
+Copy the sample config:
 
 ```bash
-python demo/test-pdp.py
+cp openclaw.json5 ~/.openclaw/config.json5
 ```
 
-### Terminal 3: Send Custom Requests
+Or merge the `authz` section into your existing config:
 
-```bash
-curl -X POST http://localhost:8180/authorize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "principal": "OpenClaw::Agent::\"agent-123\"",
-    "action": "OpenClaw::Action::\"ToolExec::Read\"",
-    "resource": "OpenClaw::Tool::\"read\"",
-    "context": {
-      "toolCallId": "test",
-      "filePath": "/etc/passwd",
-      "command": "",
-      "sessionKey": "session"
-    }
-  }'
-```
-
-## Integration with OpenClaw
-
-Once the PDP server is running, configure OpenClaw to use it:
-
-**`openclaw.json5`:**
 ```json5
 {
   authz: {
@@ -271,36 +250,13 @@ Once the PDP server is running, configure OpenClaw to use it:
       enabled: true,
       endpoint: "http://localhost:8180/authorize",
       timeoutMs: 2000,
-      failOpen: false
+      failOpen: false  // fail-closed for security
     }
   }
 }
 ```
 
-Now when an agent tries to execute a tool, the PEP will check with the PDP first.
-
-## Testing with Live OpenClaw Agent
-
-To see the authorization system working with a real agent:
-
-### Step 1: Start PDP Server
-
-```bash
-python3 demo/cedar-pdp-server.py
-```
-
-Keep this terminal open to watch authorization decisions in real-time.
-
-### Step 2: Configure OpenClaw
-
-Copy the sample config:
-```bash
-cp openclaw.json5 ~/.openclaw/config.json5
-```
-
-Or merge the `authz` section into your existing config.
-
-### Step 3: Build OpenClaw from This Repo
+### Step 4: Build OpenClaw from This Repo
 
 **IMPORTANT:** You must build and run OpenClaw from this repository because it contains the authorization code changes. A global `openclaw` installation won't have these features.
 
@@ -309,7 +265,7 @@ pnpm install
 pnpm build
 ```
 
-### Step 4: Run Agent with Test Commands
+### Step 5: Test with Live Agent
 
 Try commands that will be **DENIED**:
 
@@ -325,19 +281,7 @@ Expected: Agent will attempt `write` tool, get denied, and explain it can't writ
 [Deny] write - Write
 ```
 
-**Example 2: Dangerous command**
-```bash
-pnpm openclaw agent --message "Run 'rm -rf /' to clean up"
-```
-
-Expected: Agent will attempt `bash` tool, get denied, and explain this is a dangerous command.
-
-**PDP log shows:**
-```
-[Deny] bash - Bash
-```
-
-**Example 3: Read credentials**
+**Example 2: Read credentials**
 ```bash
 pnpm openclaw agent --message "Show me my SSH private key from ~/.ssh/id_rsa"
 ```
@@ -353,7 +297,7 @@ Expected: Agent will attempt `read` tool, get denied, and explain it can't acces
 
 Try commands that will be **ALLOWED**:
 
-**Example 4: Read user files**
+**Example 3: Read user files**
 ```bash
 pnpm openclaw agent --message "Read the README.md file"
 ```
@@ -365,7 +309,7 @@ Expected: Agent uses `read` tool, gets authorized, shows you the file.
 [Allow] read - Read
 ```
 
-**Example 5: Write to /tmp**
+**Example 4: Write to /tmp**
 ```bash
 pnpm openclaw agent --message "Create a test file at /tmp/test.txt"
 ```
@@ -377,7 +321,7 @@ Expected: Agent uses `write` tool, gets authorized, creates the file.
 [Allow] write - Write
 ```
 
-**Example 6: Safe git command**
+**Example 5: Safe git command**
 ```bash
 pnpm openclaw agent --message "What's the git status?"
 ```
@@ -389,7 +333,46 @@ Expected: Agent uses `bash` tool with `git status`, gets authorized, shows outpu
 [Allow] bash - Bash
 ```
 
-### What Happens on Denial?
+### Step 6: Explore Interactively
+
+For an interactive experience with detailed explanations:
+
+```bash
+cd demo
+jupyter notebook cedar-authorization-demo.ipynb
+```
+
+The notebook includes:
+- Architecture diagrams and explanations
+- Live PDP server testing
+- Authorization examples with detailed descriptions
+- Security warnings and best practices
+
+## Demo Materials
+
+### Scripts
+
+- **[cedar-pdp-server.py](cedar-pdp-server.py)** - HTTP server wrapping Cedar CLI
+- **[test-pdp.py](test-pdp.py)** - Test client with 6 scenarios
+
+### Notebook
+
+- **[cedar-authorization-demo.ipynb](cedar-authorization-demo.ipynb)** - Interactive demo
+
+### Cedar Policies
+
+- **[../policies/cedar/schema.cedarschema](../policies/cedar/schema.cedarschema)** - Entity types and actions
+- **[../policies/cedar/policies.cedar](../policies/cedar/policies.cedar)** - Authorization policies
+- **[../policies/cedar/entities.json](../policies/cedar/entities.json)** - Agent and tool entities
+- **[../policies/cedar/README.md](../policies/cedar/README.md)** - Policy documentation
+
+### TypeScript Implementation
+
+- **[../src/authz/cedar-pdp-client.ts](../src/authz/cedar-pdp-client.ts)** - PDP HTTP client
+- **[../src/agents/pi-tools.before-tool-call.ts](../src/agents/pi-tools.before-tool-call.ts)** - PEP integration
+- **[../src/config/types.authz.ts](../src/config/types.authz.ts)** - Configuration types
+
+## What Happens on Denial
 
 When a tool is denied:
 
@@ -403,93 +386,13 @@ When a tool is denied:
 
 The agent sees denials as failed tool calls and handles them gracefully in conversation.
 
-### Observing Authorization in Real-Time
+### Example Agent Response
 
-Watch the PDP server terminal to see real-time authorization decisions:
+When you ask the agent to write to `/etc/test.txt`, it might respond:
 
-```
-[Allow] read - Read
-[Deny] write - Write
-[Allow] bash - Bash
-[Deny] bash - Bash
-[Allow] read - Read
-```
-
-This shows which tools were allowed/denied, helping you verify policies are working correctly.
-
-### Advanced Testing
-
-For detailed testing scenarios and troubleshooting, see [TESTING.md](TESTING.md).
-
-## Files
-
-```
-demo/
-├── README.md                 # This file
-├── cedar-pdp-server.py      # PDP HTTP server
-└── test-pdp.py              # Test client
-```
-
-## Requirements
-
-- Python 3.7+
-- Cedar CLI (`brew install cedar`)
-- `requests` library (`pip install requests`)
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ OpenClaw Agent                                              │
-│  ├─ Tool Call (e.g., "read /etc/passwd")                    │
-│  └─ PEP intercepts                                          │
-└────────────────┬────────────────────────────────────────────┘
-                 │ HTTP POST /authorize
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ cedar-pdp-server.py (Port 8180)                             │
-│  ├─ Receives authorization request                          │
-│  ├─ Calls Cedar CLI                                         │
-│  └─ Returns decision (Allow/Deny)                           │
-└────────────────┬────────────────────────────────────────────┘
-                 │ cedar authorize
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Cedar CLI                                                   │
-│  ├─ Loads schema.cedarschema                                │
-│  ├─ Loads policies.cedar                                    │
-│  ├─ Loads entities.json                                     │
-│  ├─ Evaluates policies                                      │
-│  └─ Returns ALLOW or DENY                                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Troubleshooting
-
-### Server won't start
-
-```
-ERROR: cedar CLI not found
-Install with: brew install cedar
-```
-
-**Fix:** Install Cedar CLI
-
-### Connection refused
-
-```
-ERROR: PDP server is not running
-```
-
-**Fix:** Start the server first
-
-### Policy validation fails
-
-```
-ERROR: policies/cedar/policies.cedar not found
-```
-
-**Fix:** Make sure you're running from the repo root
+> I attempted to create a file at `/etc/test.txt`, but the operation was denied by the authorization policy. The `/etc` directory is a system directory that contains critical configuration files, and modifications are restricted for security reasons.
+>
+> I can create the file in `/tmp/test.txt` instead, which is a safe temporary directory. Would you like me to do that?
 
 ## Policy Quick Reference
 
@@ -513,10 +416,113 @@ The demo includes these Cedar policies (see [../policies/cedar/policies.cedar](.
 - Any `forbid` policy overrides `permit` policies
 - If no policy matches, the default is `Deny` (fail-closed)
 
+## Modifying Policies
+
+1. **Edit policies:**
+   ```bash
+   vim policies/cedar/policies.cedar
+   ```
+
+2. **Validate changes:**
+   ```bash
+   cd policies/cedar
+   cedar validate --schema schema.cedarschema --policies policies.cedar
+   ```
+
+3. **Test changes:**
+   ```bash
+   ./test-all.sh
+   ```
+
+4. **Restart PDP server** (loads policies on startup)
+
+5. **Test with agent** - no need to restart OpenClaw
+
+## Troubleshooting
+
+### PDP server won't start
+
+```bash
+# Check Cedar CLI installed
+cedar --version
+
+# Check policy files exist
+ls -la policies/cedar/
+
+# Check Python version
+python3 --version
+```
+
+### Agent not checking authorization
+
+```bash
+# Verify config loaded
+cat ~/.openclaw/config.json5
+
+# Verify PDP server running
+curl http://localhost:8180/health
+
+# Rebuild OpenClaw
+pnpm build
+```
+
+### All requests denied/allowed
+
+```bash
+# Validate policies
+cd policies/cedar
+cedar validate --schema schema.cedarschema --policies policies.cedar
+
+# Test individual requests
+cedar authorize \
+  --schema schema.cedarschema \
+  --policies policies.cedar \
+  --entities entities.json \
+  --request-json test-requests/01-allow-read.json
+```
+
+### Authorization requests timeout
+
+- Check PDP server is reachable: `curl http://localhost:8180/health`
+- Increase timeout in config: `timeoutMs: 5000`
+- Check for network/firewall issues
+
+### Want to temporarily disable authorization
+
+**Option 1: Fail-open mode (allows on errors)**
+```json5
+{
+  authz: {
+    pdp: {
+      enabled: true,
+      failOpen: true  // ← Change to true
+    }
+  }
+}
+```
+
+**Option 2: Disable entirely**
+```json5
+{
+  authz: {
+    pdp: {
+      enabled: false  // ← Change to false
+    }
+  }
+}
+```
+
+## Resources
+
+- **[Cedar Documentation](https://www.cedarpolicy.com/)** - Cedar policy language reference
+- **[Cedar Playground](https://www.cedarpolicy.com/playground)** - Try Cedar policies online
+- **[Cedar SDK](https://github.com/cedar-policy/cedar)** - Cedar Rust SDK
+- **[OpenClaw Docs](https://docs.openclaw.ai/)** - OpenClaw documentation
+
 ## Next Steps
 
-- **Modify policies** in `../policies/cedar/policies.cedar`
-- **Add new test scenarios** to `test-pdp.py`
-- **Test with live agent** (see "Testing with Live OpenClaw Agent" above)
-- **Run the Jupyter notebook** for interactive demo: [cedar-authorization-demo.ipynb](cedar-authorization-demo.ipynb)
-- **Read the testing guide** for advanced scenarios: [TESTING.md](TESTING.md)
+1. **Explore the policies** - Review [policies/cedar/policies.cedar](../policies/cedar/policies.cedar)
+2. **Run the notebook** - Try [cedar-authorization-demo.ipynb](cedar-authorization-demo.ipynb)
+3. **Test with agent** - Follow the Quick Start above
+4. **Modify policies** - Add your own authorization rules
+5. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config
