@@ -48,10 +48,11 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 request_file = f.name
 
             try:
-                # Call cedar CLI
+                # Call cedar CLI with --verbose to get policy IDs
                 result = subprocess.run(
                     [
                         'cedar', 'authorize',
+                        '--verbose',
                         '--schema', str(SCHEMA),
                         '--policies', str(POLICIES),
                         '--entities', str(ENTITIES),
@@ -75,11 +76,25 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 # Parse Cedar output
                 decision = "Allow" if "ALLOW" in result.stdout else "Deny"
 
+                # Extract policy IDs from verbose output
+                # Verbose output includes lines like "policy-1-allow-readonly" or "policy-3-deny-system-writes"
+                policy_ids = []
+                for line in result.stdout.split('\n'):
+                    # Look for lines containing policy IDs (format: policy-N-...)
+                    if 'policy-' in line.lower():
+                        # Extract policy ID from the line
+                        import re
+                        matches = re.findall(r'policy-[\w-]+', line, re.IGNORECASE)
+                        policy_ids.extend(matches)
+
+                # Remove duplicates while preserving order
+                policy_ids = list(dict.fromkeys(policy_ids))
+
                 # Build response
                 response = {
                     "decision": decision,
                     "diagnostics": {
-                        "reason": [],
+                        "reason": policy_ids,
                         "errors": []
                     }
                 }
