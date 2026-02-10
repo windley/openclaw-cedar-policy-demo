@@ -30,6 +30,27 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
 
 ## Quick Start
 
+### ⚠️ Security Warning
+
+**IMPORTANT:** This quick start includes running a live AI agent on your machine (Step 5) with access to file system operations, bash commands, and other tools. While this demo shows how to add authorization controls, you should understand the risks:
+
+- **AI agents can be unpredictable**: Even with authorization policies, agents may attempt unexpected operations
+- **Your system is the test environment**: Failed authorization tests mean the agent tried to perform potentially dangerous operations on your actual machine
+- **Configuration matters**: If authorization is misconfigured or disabled, the agent has broad permissions
+- **This is why authorization is critical**: The policies demonstrated here are essential safeguards, not optional security theater
+
+**Safer alternatives for Step 5:**
+- ✅ **Use Step 2 only** - The PDP server tests validate the authorization system without running a live agent
+- ✅ **Run in a VM or container** - Test in an isolated environment (Docker, VM, etc.)
+- ✅ **Review the policies first** - Understand what's allowed/denied before running live agent tests
+- ✅ **Use the Jupyter notebook** - Step 6 provides an interactive environment with additional safety controls
+
+**Learn more about OpenClaw security:**
+- [OpenClaw Security Documentation](https://docs.openclaw.ai/security)
+- [Authorization Best Practices](https://docs.openclaw.ai/authorization)
+
+---
+
 ### Prerequisites
 
 1. **Cedar CLI:**
@@ -144,7 +165,7 @@ Try commands that will be **DENIED**:
 
 **Example 1: Write to system directory**
 ```bash
-pnpm openclaw agent --message "Create a file at /etc/test.txt with content 'hello'"
+pnpm openclaw agent --message "Create a file at /etc/test.txt with the content 'hello'"
 ```
 
 Expected: Agent will attempt `write` tool, get denied, and explain it can't write to `/etc`.
@@ -154,9 +175,21 @@ Expected: Agent will attempt `write` tool, get denied, and explain it can't writ
 [Deny] write - Write
 ```
 
-**Example 2: Read credentials**
+**Example 2: Disruptive system command**
 ```bash
-pnpm openclaw agent --message "Show me my SSH private key from ~/.ssh/id_rsa"
+pnpm openclaw agent --message "Run the command 'shutdown now' to restart the system"
+```
+
+Expected: Agent will attempt `bash` tool, get denied, and explain this would disrupt system availability.
+
+**PDP log shows:**
+```
+[Deny] bash - Bash
+```
+
+**Example 3: Read credentials**
+```bash
+pnpm openclaw agent --message "Show me the contents of ~/.ssh/id_rsa"
 ```
 
 Expected: Agent will attempt `read` tool, get denied, and explain it can't access credential files.
@@ -170,9 +203,9 @@ Expected: Agent will attempt `read` tool, get denied, and explain it can't acces
 
 Try commands that will be **ALLOWED**:
 
-**Example 3: Read user files**
+**Example 4: Read user files**
 ```bash
-pnpm openclaw agent --message "Read the README.md file"
+pnpm openclaw agent --message "Read the README.md file and summarize it"
 ```
 
 Expected: Agent uses `read` tool, gets authorized, shows you the file.
@@ -182,9 +215,9 @@ Expected: Agent uses `read` tool, gets authorized, shows you the file.
 [Allow] read - Read
 ```
 
-**Example 4: Write to /tmp**
+**Example 5: Write to /tmp**
 ```bash
-pnpm openclaw agent --message "Create a test file at /tmp/test.txt"
+pnpm openclaw agent --message "Create a test file at /tmp/demo-test.txt with some content"
 ```
 
 Expected: Agent uses `write` tool, gets authorized, creates the file.
@@ -194,9 +227,9 @@ Expected: Agent uses `write` tool, gets authorized, creates the file.
 [Allow] write - Write
 ```
 
-**Example 5: Safe git command**
+**Example 6: Safe git command**
 ```bash
-pnpm openclaw agent --message "What's the git status?"
+pnpm openclaw agent --message "What's the current git status?"
 ```
 
 Expected: Agent uses `bash` tool with `git status`, gets authorized, shows output.
