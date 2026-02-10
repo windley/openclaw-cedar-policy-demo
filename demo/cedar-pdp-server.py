@@ -62,6 +62,16 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                     cwd=str(CEDAR_DIR)
                 )
 
+                # Debug: Show Cedar CLI output
+                print("\n--- Cedar Request ---")
+                print(json.dumps(cedar_request, indent=2))
+                print("\n--- Cedar CLI Output ---")
+                print(result.stdout)
+                if result.stderr:
+                    print("--- Cedar CLI Errors ---")
+                    print(result.stderr)
+                print("--- End Cedar Output ---\n")
+
                 # Parse Cedar output
                 decision = "Allow" if "ALLOW" in result.stdout else "Deny"
 
