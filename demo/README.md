@@ -312,9 +312,11 @@ When a tool execution is denied, the agent:
 
 This proves that authorization isn't just blocking operations—it's providing feedback that helps the agent make better decisions!
 
-### Step 8: Explore Interactively
+---
 
-For an interactive experience with detailed explanations:
+## Alternative: Interactive Exploration with Jupyter
+
+**Prefer a notebook-based approach?** Instead of running the command-line examples above, you can explore the demo interactively with detailed explanations:
 
 ```bash
 cd demo
