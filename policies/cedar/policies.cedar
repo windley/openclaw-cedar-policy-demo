@@ -51,12 +51,15 @@ when {
 };
 
 //
-// Policy 4: Allow safe bash commands (list, inspect, read-only)
+// Policy 4: Allow safe bash/exec commands (list, inspect, read-only)
 //
 @id("policy-4-allow-safe-bash")
 permit(
   principal,
-  action == OpenClaw::Action::"ToolExec::Bash",
+  action in [
+    OpenClaw::Action::"ToolExec::Bash",
+    OpenClaw::Action::"ToolExec::Exec"
+  ],
   resource
 )
 when {
@@ -75,12 +78,15 @@ when {
 };
 
 //
-// Policy 5: Deny dangerous bash commands
+// Policy 5: Deny dangerous bash/exec commands
 //
 @id("policy-5-deny-dangerous-bash")
 forbid(
   principal,
-  action == OpenClaw::Action::"ToolExec::Bash",
+  action in [
+    OpenClaw::Action::"ToolExec::Bash",
+    OpenClaw::Action::"ToolExec::Exec"
+  ],
   resource
 )
 when {
@@ -105,7 +111,10 @@ when {
 @id("policy-6-allow-git-ops")
 permit(
   principal,
-  action == OpenClaw::Action::"ToolExec::Bash",
+  action in [
+    OpenClaw::Action::"ToolExec::Bash",
+    OpenClaw::Action::"ToolExec::Exec"
+  ],
   resource
 )
 when {
@@ -200,4 +209,51 @@ when {
   context.filePath like "/Users/*" ||
   context.filePath like "./*" ||
   !(context.filePath like "/*")
+};
+
+//
+// Demo Policies: Protect ~/openclaw-demo-protected directory
+// These policies demonstrate Cedar authorization with a safe test directory
+//
+
+//
+// Policy Demo-1: Deny reading credentials in protected directory
+//
+@id("policy-demo-1-deny-protected-credentials")
+forbid(
+  principal,
+  action == OpenClaw::Action::"ToolExec::Read",
+  resource
+)
+when {
+  context.filePath like "*/openclaw-demo-protected/credentials/*"
+};
+
+//
+// Policy Demo-2: Deny writing to protected directory
+//
+@id("policy-demo-2-deny-protected-writes")
+forbid(
+  principal,
+  action in [
+    OpenClaw::Action::"ToolExec::Write",
+    OpenClaw::Action::"ToolExec::Edit"
+  ],
+  resource
+)
+when {
+  context.filePath like "*/openclaw-demo-protected/*"
+};
+
+//
+// Policy Demo-3: Deny executing scripts in protected directory
+//
+@id("policy-demo-3-deny-protected-scripts")
+forbid(
+  principal,
+  action == OpenClaw::Action::"ToolExec::Bash",
+  resource
+)
+when {
+  context.command like "*/openclaw-demo-protected/scripts/*"
 };
