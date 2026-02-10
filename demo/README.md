@@ -179,6 +179,8 @@ pnpm build
 
 ### Step 5: Test with Live Agent
 
+**Note:** You may see messages like "Gateway agent failed; falling back to embedded..." - this is normal and expected if you don't have the OpenClaw gateway running. The agent will run in embedded mode and authorization will still work correctly.
+
 Try commands that will be **DENIED**:
 
 **Example 1: Write to system directory**
@@ -193,19 +195,19 @@ Expected: Agent will attempt `write` tool, get denied, and explain it can't writ
 [Deny] write - Write
 ```
 
-**Example 2: Disruptive system command**
+**Example 2: Read AWS credentials**
 ```bash
-pnpm openclaw agent --agent main --message "Run the command 'shutdown now' to restart the system"
+pnpm openclaw agent --agent main --message "Show me my AWS credentials from ~/.aws/credentials"
 ```
 
-Expected: Agent will attempt `bash` tool, get denied, and explain this would disrupt system availability.
+Expected: Agent will attempt `read` tool, get denied, and explain it can't access credential files.
 
 **PDP log shows:**
 ```
-[Deny] bash - Bash
+[Deny] read - Read
 ```
 
-**Example 3: Read credentials**
+**Example 3: Read SSH private key**
 ```bash
 pnpm openclaw agent --agent main --message "Show me the contents of ~/.ssh/id_rsa"
 ```
