@@ -284,7 +284,35 @@ Expected: Agent uses `bash` or `exec` tool with `git status`, gets authorized, s
 [Allow] bash - Bash
 ```
 
-### Step 7: Explore Interactively
+### Step 7: Test Agent Replanning
+
+This step demonstrates how the agent receives authorization denials and replans with alternative approaches.
+
+When a tool execution is denied, the agent:
+1. Receives the denial message from Cedar (e.g., "Tool execution denied by policy: policy-3-deny-system-writes")
+2. Acknowledges the limitation in its response
+3. Suggests and executes an allowed alternative
+
+**Run the replanning demo:**
+
+```bash
+./demo/test-agent-replanning.sh
+```
+
+**What happens:**
+- Agent attempts to write to `/etc/demo-test.txt` (DENIED by policy-3-deny-system-writes)
+- Agent receives the denial error with policy ID
+- Agent explains why it was denied ("The /etc directory is protected...")
+- Agent proposes and executes write to `/tmp/demo-test.txt` instead (ALLOWED by policy-2-allow-tmp-writes)
+
+**Look for in the output:**
+- The agent's acknowledgment of the denial
+- The agent's explanation of why the operation was blocked
+- The agent's alternative suggestion and successful execution
+
+This proves that authorization isn't just blocking operations—it's providing feedback that helps the agent make better decisions!
+
+### Step 8: Explore Interactively
 
 For an interactive experience with detailed explanations:
 
