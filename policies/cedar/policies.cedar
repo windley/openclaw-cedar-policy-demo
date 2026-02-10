@@ -251,7 +251,10 @@ when {
 @id("policy-demo-3-deny-protected-scripts")
 forbid(
   principal,
-  action == OpenClaw::Action::"ToolExec::Bash",
+  action in [
+    OpenClaw::Action::"ToolExec::Bash",
+    OpenClaw::Action::"ToolExec::Exec"
+  ],
   resource
 )
 when {
