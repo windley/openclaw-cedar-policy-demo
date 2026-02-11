@@ -14,9 +14,9 @@ When authorization is enabled, every tool execution request is intercepted and e
 
 Watch a complete walkthrough of the Cedar authorization demo:
 
-[![Cedar Authorization Demo](https://img.youtube.com/vi/i0kZNBYZ5no/maxresdefault.jpg)](https://youtu.be/i0kZNBYZ5no)
+[![Cedar Authorization Demo](https://img.youtube.com/vi/K8YeW2ZhzpQ/maxresdefault.jpg)](https://youtu.be/K8YeW2ZhzpQ)
 
-**[▶️ Watch on YouTube: Cedar Authorization Demo for OpenClaw](https://youtu.be/i0kZNBYZ5no)** (10 minutes)
+**[▶️ Watch on YouTube: Cedar Authorization Demo for OpenClaw](https://youtu.be/K8YeW2ZhzpQ)** (10 minutes)
 
 The video demonstrates:
 - Setting up the Cedar PDP server
