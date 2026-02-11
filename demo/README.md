@@ -57,11 +57,10 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
 - ✅ **Use Step 2 only** - The PDP server tests validate the authorization system without running a live agent
 - ✅ **Run in a VM or container** - Test in an isolated environment (Docker, VM, etc.)
 - ✅ **Review the policies first** - Understand what's allowed/denied before running live agent tests
-- ✅ **Use the Jupyter notebook** - Step 6 provides an interactive environment with additional safety controls
+
 
 **Learn more about OpenClaw security:**
 - [OpenClaw Security Documentation](https://docs.openclaw.ai/security)
-- [Authorization Best Practices](https://docs.openclaw.ai/authorization)
 
 ---
 
