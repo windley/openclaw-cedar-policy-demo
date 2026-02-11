@@ -24,7 +24,7 @@ echo ""
 echo "================================================================"
 echo ""
 
-pnpm openclaw agent --agent main --message "I'm testing authorization. Please create a test file at /etc/demo-test.txt with the content 'test data'."
+pnpm openclaw agent --agent main --message "Please create a test file at /etc/demo-test.txt with the content 'test data'."
 
 echo ""
 echo "================================================================"
