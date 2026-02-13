@@ -16,23 +16,36 @@ REPO_ROOT = Path(__file__).parent.parent
 CEDAR_DIR = REPO_ROOT / "policies" / "cedar"
 SCHEMA = CEDAR_DIR / "schema.cedarschema"
 POLICIES = CEDAR_DIR / "policies.cedar"
+POLICIES_TPE = CEDAR_DIR / "policies-tpe.cedar"
 ENTITIES = CEDAR_DIR / "entities.json"
 
 class CedarPDPHandler(BaseHTTPRequestHandler):
     """HTTP handler for Cedar authorization requests."""
 
     def do_POST(self):
-        """Handle POST requests to /authorize."""
-        if self.path != "/authorize":
-            self.send_error(404, "Not Found - use POST /authorize")
-            return
-
+        """Handle POST requests to /authorize or /query-constraints."""
         # Read request body
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length).decode('utf-8')
 
         try:
-            authz_request = json.loads(body)
+            request_data = json.loads(body)
+
+            if self.path == "/authorize":
+                self._handle_authorize(request_data)
+            elif self.path == "/query-constraints":
+                self._handle_query_constraints(request_data)
+            else:
+                self.send_error(404, "Not Found - use POST /authorize or /query-constraints")
+
+        except Exception as e:
+            error_msg = str(e)
+            sys.stderr.write("ERROR: {}\n".format(error_msg))
+            self.send_error(500, "Internal Server Error: {}".format(error_msg))
+
+    def _handle_authorize(self, authz_request):
+        """Handle authorization request."""
+        try:
 
             # Build Cedar request
             cedar_request = {
@@ -114,9 +127,101 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 Path(request_file).unlink(missing_ok=True)
 
         except Exception as e:
-            error_msg = str(e)
-            sys.stderr.write("ERROR: {}\n".format(error_msg))
-            self.send_error(500, "Internal Server Error: {}".format(error_msg))
+            # Re-raise to be caught by outer handler
+            raise
+
+    def _handle_query_constraints(self, query_request):
+        """Handle TPE query-constraints request."""
+        # Extract components from entity IDs (e.g., "OpenClaw::Agent::\"main\"")
+        principal = query_request["principal"]
+        action = query_request["action"]
+        resource = query_request["resource"]
+
+        # Parse entity ID format: "Namespace::Type::\"eid\""
+        def parse_entity_id(full_id):
+            """Parse Cedar entity ID into type and eid."""
+            # Example: "OpenClaw::Agent::\"main\"" -> ("OpenClaw::Agent", "main")
+            parts = full_id.split("::")
+            if len(parts) >= 3:
+                entity_type = "::".join(parts[:-1])
+                eid = parts[-1].strip('"')
+                return entity_type, eid
+            return full_id, ""
+
+        principal_type, principal_eid = parse_entity_id(principal)
+        resource_type, resource_eid = parse_entity_id(resource)
+
+        # Call cedar tpe with individual arguments (no context - that's what we're querying)
+        result = subprocess.run(
+            [
+                'cedar', 'tpe',
+                '--schema', str(SCHEMA),
+                '--policies', str(POLICIES_TPE),
+                '--entities', str(ENTITIES),
+                '--principal-type', principal_type,
+                '--principal-eid', principal_eid,
+                '--action', action,
+                '--resource-type', resource_type,
+                '--resource-eid', resource_eid
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(CEDAR_DIR)
+        )
+
+        # Debug: Show Cedar TPE output
+        print("\n--- Cedar TPE Query ---")
+        print("Principal: {} ({})".format(principal_type, principal_eid))
+        print("Action: {}".format(action))
+        print("Resource: {} ({})".format(resource_type, resource_eid))
+        print("\n--- Cedar TPE Output ---")
+        print(result.stdout)
+        if result.stderr:
+            print("--- Cedar TPE Errors ---")
+            print(result.stderr)
+        print("--- End Cedar TPE Output ---\n")
+
+        # Parse residual policies from output
+        # The output contains the decision (UNKNOWN) and residual policies in Cedar syntax
+        residuals = []
+        current_residual = []
+        in_residual = False
+
+        for line in result.stdout.split('\n'):
+            # Look for policy annotations like @id("policy-2-allow-tmp-writes")
+            if line.strip().startswith('@id('):
+                if current_residual:
+                    residuals.append('\n'.join(current_residual))
+                current_residual = [line]
+                in_residual = True
+            elif in_residual:
+                if line.strip() and not line.strip().startswith('---'):
+                    current_residual.append(line)
+                elif line.strip().startswith('---') or not line.strip():
+                    if current_residual and current_residual[-1].strip().endswith(';'):
+                        residuals.append('\n'.join(current_residual))
+                        current_residual = []
+                        in_residual = False
+
+        # Add last residual if exists
+        if current_residual:
+            residuals.append('\n'.join(current_residual))
+
+        # Build response
+        response = {
+            "decision": "UNKNOWN",  # TPE always returns UNKNOWN with residuals
+            "residuals": residuals,
+            "explanation": "These are the policy constraints that must be satisfied for authorization"
+        }
+
+        # Send response
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(response, indent=2).encode('utf-8'))
+
+        # Log
+        print("[TPE Query] {} - returned {} residual policies".format(action, len(residuals)))
 
     def do_GET(self):
         """Handle GET requests (health check)."""
@@ -150,23 +255,32 @@ def main():
             sys.stderr.write("ERROR: {} not found\n".format(path))
             sys.exit(1)
 
+    # Check for TPE policies (optional, warn if missing)
+    if not POLICIES_TPE.exists():
+        print("Warning: {} not found - /query-constraints endpoint will not work".format(POLICIES_TPE))
+        print("TPE queries require policies with 'has' checks for optional context attributes")
+        print()
+
     # Start server
     server = HTTPServer(('localhost', port), CedarPDPHandler)
 
-    print("=" * 60)
+    print("=" * 70)
     print("Cedar PDP Server for OpenClaw Authorization")
-    print("=" * 60)
+    print("=" * 70)
     print("Listening:  http://localhost:{}".format(port))
     print("Schema:     {}".format(SCHEMA.relative_to(REPO_ROOT)))
     print("Policies:   {}".format(POLICIES.relative_to(REPO_ROOT)))
+    if POLICIES_TPE.exists():
+        print("TPE Policies: {}".format(POLICIES_TPE.relative_to(REPO_ROOT)))
     print("Entities:   {}".format(ENTITIES.relative_to(REPO_ROOT)))
     print()
     print("Endpoints:")
-    print("  POST /authorize - Authorization requests")
-    print("  GET  /health    - Health check")
+    print("  POST /authorize          - Authorization requests (reactive)")
+    print("  POST /query-constraints  - TPE constraint queries (proactive)")
+    print("  GET  /health             - Health check")
     print()
     print("Ready to authorize tool executions...")
-    print("=" * 60)
+    print("=" * 70)
     print()
 
     try:

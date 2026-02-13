@@ -55,9 +55,7 @@ jupyter notebook cedar-authorization-demo.ipynb
 ```
 
 **Demo resources:**
-- **[demo/DEMO.md](demo/DEMO.md)** - Complete demo overview and guide
-- **[demo/README.md](demo/README.md)** - Scripts and live agent testing
-- **[demo/TESTING.md](demo/TESTING.md)** - Comprehensive testing scenarios
+- **[demo/README.md](demo/README.md)** - Complete guide with architecture, quickstart, scripts, and live agent testing
 - **[demo/cedar-authorization-demo.ipynb](demo/cedar-authorization-demo.ipynb)** - Interactive Jupyter notebook
 - **[policies/cedar/](policies/cedar/)** - Cedar schema, policies, and entities
 

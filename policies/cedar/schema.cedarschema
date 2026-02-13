@@ -98,10 +98,10 @@ namespace OpenClaw {
     // Session key (agent session identifier)
     "sessionKey"?: String,
 
-    // File path (for file operation tools: read, write, edit) - provide empty string if N/A
-    "filePath": String,
+    // File path (for file operation tools: read, write, edit) - optional for TPE queries
+    "filePath"?: String,
 
-    // Command string (for exec/bash tools) - provide empty string if N/A
-    "command": String,
+    // Command string (for exec/bash tools) - optional for TPE queries
+    "command"?: String,
   };
 }

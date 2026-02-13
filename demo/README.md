@@ -77,7 +77,10 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
 
    Get your API key from: https://console.anthropic.com/
 
-2. **Cedar CLI:**
+2. **Cedar CLI with TPE support:**
+
+   **Note:** The advanced [query-constraints demo](README-query-constraints.md) requires Cedar built with Typed Partial Evaluation (TPE). Even if you only plan to use the basic reactive authorization demo, we recommend building with TPE from the start.
+
    ```bash
    # Install Rust/Cargo if not already installed
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -85,9 +88,28 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
    # Add Cargo to PATH (or restart your shell)
    source $HOME/.cargo/env
 
-   # Install Cedar CLI
-   cargo install cedar-policy-cli
+   # Install Protocol Buffer Compiler (required for building Cedar)
+   # macOS:
+   brew install protobuf
+   # Linux:
+   # sudo apt-get install protobuf-compiler
+
+   # Build Cedar CLI from source with TPE feature
+   git clone https://github.com/cedar-policy/cedar.git
+   cd cedar
+   cargo build --release --bin cedar --features tpe
+
+   # Add Cedar binary to PATH
+   export PATH="$PATH:$(pwd)/target/release"
+   # Or add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+   echo "export PATH=\"\$PATH:$(pwd)/target/release\"" >> ~/.zshrc
+
+   # Verify installation
+   cedar --version
+   cedar tpe --help  # Should show TPE subcommand
    ```
+
+   **Why build from source?** The `--features tpe` flag enables Typed Partial Evaluation at compile time. Pre-built binaries from `cargo install cedar-policy-cli` do not include this experimental feature.
 
 3. **Node.js and pnpm:**
    ```bash
