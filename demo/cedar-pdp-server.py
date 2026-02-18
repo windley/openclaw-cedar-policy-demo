@@ -155,12 +155,12 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
         result = subprocess.run(
             [
                 'cedar', 'tpe',
-                '--schema', str(SCHEMA),
-                '--policies', str(POLICIES_TPE),
+                '-s', str(SCHEMA),
+                '-p', str(POLICIES_TPE),
                 '--entities', str(ENTITIES),
                 '--principal-type', principal_type,
                 '--principal-eid', principal_eid,
-                '--action', action,
+                '-a', action,
                 '--resource-type', resource_type,
                 '--resource-eid', resource_eid
             ],
