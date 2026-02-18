@@ -154,6 +154,55 @@ pnpm openclaw agent --agent main --message "I want to create a file with the con
 - Basic: Agent tries `/etc`, fails, learns, tries `/tmp`, succeeds (2 attempts, no user choice)
 - TPE: Agent queries first, presents options to user, writes to chosen location, succeeds (1 attempt, user-directed)
 
+#### Example: Discovering credential file restrictions
+
+```bash
+pnpm openclaw agent --agent main --message "Can you check if there are any SSH keys on this system?"
+```
+
+**What happens:**
+1. Agent queries read constraints via `QueryAuthorizationConstraints`
+2. Discovers that paths matching `*/.ssh/*`, `*/.aws/*`, `*.pem`, `*.key`, etc. are forbidden
+3. Agent explains upfront that it cannot access credential files due to policy restrictions
+4. No failed attempts — the agent knows the boundaries before trying
+
+#### Example: Exploring shell command boundaries
+
+```bash
+pnpm openclaw agent --agent main --message "I want to run a cleanup script. What shell commands am I allowed to run?"
+```
+
+**What happens:**
+1. Agent queries bash constraints via `QueryAuthorizationConstraints`
+2. Discovers allowed commands: `ls`, `cat`, `grep`, `find`, `echo`, `git status`, `git log`, `git diff`
+3. Discovers forbidden commands: `rm -rf`, `dd`, `mkfs`, `shutdown`, `reboot`, `curl | sh`
+4. Agent presents the allowed/denied command categories and asks what cleanup tasks you need
+
+#### Example: Mixed allow/deny in a single task
+
+```bash
+pnpm openclaw agent --agent main --message "Please read the file at ~/openclaw-demo-protected/credentials/api-keys.txt and also read ~/openclaw-cedar-policy-demo/README.md"
+```
+
+**What happens:**
+1. Agent queries read constraints and sees that `*/openclaw-demo-protected/credentials/*` is forbidden
+2. Agent reads `README.md` successfully (workspace paths are allowed)
+3. Agent explains that the credentials file is protected by policy and cannot be accessed
+4. Demonstrates the agent adapting mid-task — completing what it can while respecting what it cannot
+
+#### Example: Planning around multiple constraints
+
+```bash
+pnpm openclaw agent --agent main --message "Create a backup of /etc/hosts in a safe location"
+```
+
+**What happens:**
+1. Agent queries both read and write constraints
+2. Discovers that reading `/etc/*` is allowed (policy-1 permits read-only tools) but writing to `/etc/*` is forbidden
+3. Discovers that writing to `/tmp/*` or workspace paths is allowed
+4. Agent reads `/etc/hosts`, then writes the backup to `/tmp/hosts.backup`
+5. Demonstrates the agent understanding constraints across multiple operations and planning a path that satisfies all of them
+
 ## Implementation Details
 
 ### 1. Extended PDP Server
