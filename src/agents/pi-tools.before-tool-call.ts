@@ -29,8 +29,9 @@ export async function runBeforeToolCallHook(args: {
   const params = args.params;
 
   // Check PDP authorization first (if enabled)
+  // Skip for query_authorization_constraints — it's a meta-tool about authorization
   const pdpConfig = args.ctx?.config?.authz?.pdp;
-  if (pdpConfig?.enabled && pdpConfig.endpoint) {
+  if (pdpConfig?.enabled && pdpConfig.endpoint && toolName !== "query_authorization_constraints") {
     try {
       const decision = await authorizeTool(
         {
