@@ -137,15 +137,15 @@ Results: 3 passed, 0 failed
 
 ### Step 3: Test Agent with Query Tool
 
-Run the agent with the new `QueryAuthorizationConstraints` tool:
+The agent now has a built-in `query_authorization_constraints` tool. When the PDP is enabled and `queryConstraintsEndpoint` is configured, the tool is automatically available. Run:
 
 ```bash
-pnpm openclaw agent --agent main --message "I want to create a file with the content 'Hello World!'. Please let me know what paths you can write to and let me choose where to write it."
+pnpm openclaw agent --agent main --message "I want to create a file with the content 'Hello World!'. Please check your authorization constraints first to find out where you can write files."
 ```
 
 **What happens:**
-1. Agent uses `QueryAuthorizationConstraints` tool to ask "What can I write to?"
-2. Receives constraints: `/tmp/*` or `/var/tmp/*` are allowed
+1. Agent calls `query_authorization_constraints` with `action: "write"`
+2. Receives residual policies showing `/tmp/*` or `/var/tmp/*` are allowed
 3. Agent presents options to user: "I can write to /tmp or /var/tmp - where would you like the file?"
 4. User chooses location (e.g., `/tmp/hello.txt`)
 5. Agent executes write with content "Hello World!", which succeeds (already knows it's allowed)
@@ -161,7 +161,7 @@ pnpm openclaw agent --agent main --message "Check what's in ~/openclaw-demo-prot
 ```
 
 **What happens:**
-1. Agent queries read constraints via `QueryAuthorizationConstraints`
+1. Agent queries read constraints via `query_authorization_constraints`
 2. Discovers that paths matching `*/openclaw-demo-protected/credentials/*` are forbidden by policy
 3. Agent explains upfront that it cannot access the credentials directory due to authorization policy
 4. No failed attempts — the agent knows the boundaries before trying, thanks to Cedar TPE
@@ -221,19 +221,45 @@ pnpm openclaw agent --agent main --message "Create a backup of /etc/hosts in a s
 }
 ```
 
-### 2. New Agent Tool
+### 2. Agent Tool: `query_authorization_constraints`
 
-`QueryAuthorizationConstraints` tool definition (in OpenClaw integration):
+The tool is implemented in `src/agents/tools/query-authz-tool.ts` and registered automatically when `authz.pdp.enabled` and `queryConstraintsEndpoint` are both configured.
+
+**Tool definition:**
 
 ```typescript
 {
-  name: "QueryAuthorizationConstraints",
-  description: "Query what operations are allowed by the authorization system. Use this BEFORE attempting operations to understand what's permitted.",
+  name: "query_authorization_constraints",
+  description: "Query what operations are allowed by the authorization system. Use this BEFORE attempting file or command operations to discover what's permitted and what constraints apply.",
   parameters: {
     action: {
-      type: "string",
-      enum: ["write", "read", "bash", "exec"],
-      description: "The type of operation to query constraints for"
+      type: "string",  // "write", "read", "bash", "edit", or "exec"
+    }
+  }
+}
+```
+
+**Tool output format:**
+
+```json
+{
+  "action": "write",
+  "decision": "UNKNOWN",
+  "constraintCount": 2,
+  "constraints": "[Policy 1]\n@id(\"policy-2-allow-tmp-writes\")\npermit(...) when { ... };\n\n[Policy 2]\n@id(\"policy-3-deny-system-writes\")\nforbid(...) when { ... };",
+  "explanation": "These are the policy constraints that must be satisfied for authorization"
+}
+```
+
+**Configuration** (`openclaw.json5`):
+
+```json5
+{
+  authz: {
+    pdp: {
+      enabled: true,
+      endpoint: "http://localhost:8180/authorize",
+      queryConstraintsEndpoint: "http://localhost:8180/query-constraints"
     }
   }
 }

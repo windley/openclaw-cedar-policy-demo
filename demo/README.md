@@ -331,6 +331,20 @@ When a tool execution is denied, the agent:
 
 This proves that authorization isn't just blocking operations—it's providing feedback that helps the agent make better decisions!
 
+### Step 8: Proactive Authorization with Query Constraints (Optional)
+
+The basic demo above shows **reactive** authorization - the agent attempts operations and learns from denials. For **proactive** authorization, where the agent queries what's allowed *before* acting, see the [Query Constraints Demo](README-query-constraints.md).
+
+When the `queryConstraintsEndpoint` is configured, the agent gains a `query_authorization_constraints` tool that calls Cedar's Typed Partial Evaluation (TPE) to discover constraints upfront:
+
+```bash
+pnpm openclaw agent --agent main --message "I want to create a file. Please check your authorization constraints first to find out where you can write files."
+```
+
+Instead of trial-and-error, the agent learns from the residual policies that writes are allowed to `/tmp/*` and plans accordingly - succeeding on the first attempt.
+
+See the [full TPE demo](README-query-constraints.md) for setup, examples, and trade-offs.
+
 ---
 
 ## Alternative: Interactive Exploration with Jupyter
@@ -495,8 +509,9 @@ The implementation follows these principles:
 
 ### TypeScript Implementation
 
-- **[../src/authz/cedar-pdp-client.ts](../src/authz/cedar-pdp-client.ts)** - PDP HTTP client
+- **[../src/authz/cedar-pdp-client.ts](../src/authz/cedar-pdp-client.ts)** - PDP HTTP client (authorize + query constraints)
 - **[../src/agents/pi-tools.before-tool-call.ts](../src/agents/pi-tools.before-tool-call.ts)** - PEP integration
+- **[../src/agents/tools/query-authz-tool.ts](../src/agents/tools/query-authz-tool.ts)** - Proactive constraint query tool
 - **[../src/config/types.authz.ts](../src/config/types.authz.ts)** - Configuration types
 
 ## What Happens on Denial
@@ -651,5 +666,6 @@ cedar authorize \
 1. **Explore the policies** - Review [policies/cedar/policies.cedar](../policies/cedar/policies.cedar)
 2. **Run the notebook** - Try [cedar-authorization-demo.ipynb](cedar-authorization-demo.ipynb)
 3. **Test with agent** - Follow the Quick Start above
-4. **Modify policies** - Add your own authorization rules
-5. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config
+4. **Try proactive authorization** - See the [Query Constraints Demo](README-query-constraints.md) for Cedar TPE
+5. **Modify policies** - Add your own authorization rules
+6. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config
