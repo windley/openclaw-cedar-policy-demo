@@ -32,28 +32,7 @@ The agent receives **constraint expressions** that describe the space of allowed
 
 This extends the basic architecture with a new query capability:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Agent Planning Phase                                        │
-│                                                              │
-│ 1. Agent needs to write a file                             │
-│ 2. Queries: "What paths can I write to?"                   │
-│    ↓                                                         │
-│ 3. PDP (TPE): Returns constraint expressions               │
-│    ↓                                                         │
-│ 4. Agent plans: "I'll write to /tmp/file.txt"             │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-                         ↓
-┌─────────────────────────────────────────────────────────────┐
-│ Agent Execution Phase (same as basic demo)                 │
-│                                                              │
-│ 5. Agent executes: write to /tmp/file.txt                  │
-│ 6. PEP checks authorization                                 │
-│ 7. PDP evaluates: Allow                                     │
-│ 8. Tool executes successfully                               │
-└─────────────────────────────────────────────────────────────┘
-```
+![Querying Constraints Architecture](querying_constraints.png)
 
 ## Prerequisites
 
