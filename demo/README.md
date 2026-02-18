@@ -99,17 +99,15 @@ The Cedar authorization system integrates into OpenClaw's agent execution loop, 
    cd cedar
    cargo build --release --bin cedar --features tpe
 
-   # Add Cedar binary to PATH
-   export PATH="$PATH:$(pwd)/target/release"
-   # Or add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
-   echo "export PATH=\"\$PATH:$(pwd)/target/release\"" >> ~/.zshrc
+   # Install the built binary into ~/.cargo/bin (replaces any previous cedar install)
+   cp target/release/cedar ~/.cargo/bin/cedar
 
    # Verify installation
    cedar --version
-   cedar tpe --help  # Should show TPE subcommand
+   cedar tpe --help  # Should show TPE subcommand options (--schema, --policies, etc.)
    ```
 
-   **Why build from source?** The `--features tpe` flag enables Typed Partial Evaluation at compile time. Pre-built binaries from `cargo install cedar-policy-cli` do not include this experimental feature.
+   **Why build from source?** The `--features tpe` flag enables Typed Partial Evaluation at compile time. Pre-built binaries from `cargo install cedar-policy-cli` do not include this experimental feature. Copying the built binary into `~/.cargo/bin` ensures it takes precedence and replaces any previously installed version.
 
 3. **Node.js and pnpm:**
    ```bash
