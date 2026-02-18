@@ -166,18 +166,16 @@ pnpm openclaw agent --agent main --message "Check what's in ~/openclaw-demo-prot
 3. Agent explains upfront that it cannot access the credentials directory due to authorization policy
 4. No failed attempts — the agent knows the boundaries before trying, thanks to Cedar TPE
 
-#### Example: Planning around multiple constraints
+#### Example: Discovering allowed git operations
 
 ```bash
-pnpm openclaw agent --agent main --message "Create a backup of /etc/hosts in a safe location"
+pnpm openclaw agent --agent main --message "What git actions are you allowed to do?"
 ```
 
 **What happens:**
-1. Agent queries both read and write constraints
-2. Discovers that reading `/etc/*` is allowed (policy-1 permits read-only tools) but writing to `/etc/*` is forbidden
-3. Discovers that writing to `/tmp/*` or workspace paths is allowed
-4. Agent reads `/etc/hosts`, then writes the backup to `/tmp/hosts.backup`
-5. Demonstrates the agent understanding constraints across multiple operations and planning a path that satisfies all of them
+1. Agent calls `query_authorization_constraints` with `action: "bash"`
+2. Receives residual policies showing which commands are permitted (e.g., `git status`, `git add`, `git commit`, etc.)
+3. Agent summarizes the allowed git operations based on the policy constraints
 
 ## Implementation Details
 
