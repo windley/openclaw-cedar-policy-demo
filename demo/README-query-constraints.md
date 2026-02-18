@@ -1,6 +1,6 @@
 # Cedar Query Constraints Demo for OpenClaw
 
-**Advanced Feature:** This demo extends the basic Cedar authorization demo with **Typed Partial Evaluation (TPE)**, allowing the agent to proactively query what operations are allowed *before* attempting them.
+**Advanced Feature:** This demo extends the basic Cedar authorization demo with **[Typed Partial Evaluation (TPE)](https://www.cedarpolicy.com/blog/partial-evaluation)**, allowing the agent to proactively query what operations are allowed *before* attempting them.
 
 > 📚 **Start with the basics first!** Complete the [main Cedar demo](README.md) before exploring this advanced feature.
 
@@ -30,9 +30,21 @@ The agent receives **constraint expressions** that describe the space of allowed
 
 ## Architecture
 
-This extends the basic architecture with a new query capability:
+This extends the basic architecture with a **planning phase** before execution. The code in this repo adds a `query_authorization_constraints` tool to OpenClaw that calls the PDP's TPE endpoint, receiving residual policies that describe what's allowed without specifying a concrete operation. The agent interprets these constraints and plans accordingly — then during execution, the PEP still validates each concrete operation as before.
 
 ![Querying Constraints Architecture](querying_constraints.png)
+
+The key insight is that the planning phase and execution phase use *different* PDP endpoints: `/query-constraints` returns partial policy residuals (what *could* be allowed), while `/authorize` makes a concrete allow/deny decision for a specific operation. Together they give the agent both foresight and enforcement.
+
+### System Prompt Guidance
+
+Adding the tool alone isn't enough — the agent also needs to know *when* to use it. Without guidance, the agent may read the Cedar policy files directly from disk instead of querying the live PDP. When the query constraints endpoint is configured, this repo injects an "Authorization Policy" section into the agent's system prompt (see `src/agents/pi-embedded-runner/run/attempt.ts`) instructing the agent to:
+
+- Use the `query_authorization_constraints` tool **before** file or command operations
+- **Not** read policy files from disk to determine permissions
+- Pass the relevant action type (`write`, `read`, `bash`, or `edit`)
+
+This ensures the agent queries the live policy decision point rather than trying to interpret raw policy files on its own.
 
 ## Prerequisites
 
@@ -371,11 +383,8 @@ Looking at the residual policies, the agent understands:
 
 ## Next Steps
 
-1. **Understand the basic demo** - Complete [README.md](README.md) first
-2. **Test TPE queries** - Run `test-query-constraints.py`
-3. **Try agent examples** - See proactive planning in action
-4. **Compare approaches** - Run same task with and without TPE
-5. **Integrate into your workflow** - Decide when reactive vs proactive is best
+1. **Compare approaches** - Run same task with and without TPE
+2. **Integrate into your workflow** - Decide when reactive vs proactive is best
 
 ---
 
