@@ -166,18 +166,6 @@ pnpm openclaw agent --agent main --message "Check what's in ~/openclaw-demo-prot
 3. Agent explains upfront that it cannot access the credentials directory due to authorization policy
 4. No failed attempts — the agent knows the boundaries before trying, thanks to Cedar TPE
 
-#### Example: Mixed allow/deny in a single task
-
-```bash
-pnpm openclaw agent --agent main --message "Please read the file at ~/openclaw-demo-protected/credentials/api-keys.txt and also read ~/openclaw-cedar-policy-demo/README.md"
-```
-
-**What happens:**
-1. Agent queries read constraints and sees that `*/openclaw-demo-protected/credentials/*` is forbidden
-2. Agent reads `README.md` successfully (workspace paths are allowed)
-3. Agent explains that the credentials file is protected by policy and cannot be accessed
-4. Demonstrates the agent adapting mid-task — completing what it can while respecting what it cannot
-
 #### Example: Planning around multiple constraints
 
 ```bash
