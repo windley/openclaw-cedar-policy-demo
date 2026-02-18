@@ -157,26 +157,14 @@ pnpm openclaw agent --agent main --message "I want to create a file with the con
 #### Example: Discovering credential file restrictions
 
 ```bash
-pnpm openclaw agent --agent main --message "Can you check if there are any SSH keys on this system?"
+pnpm openclaw agent --agent main --message "Check what's in ~/openclaw-demo-protected/credentials/ and tell me what you find"
 ```
 
 **What happens:**
 1. Agent queries read constraints via `QueryAuthorizationConstraints`
-2. Discovers that paths matching `*/.ssh/*`, `*/.aws/*`, `*.pem`, `*.key`, etc. are forbidden
-3. Agent explains upfront that it cannot access credential files due to policy restrictions
-4. No failed attempts — the agent knows the boundaries before trying
-
-#### Example: Exploring shell command boundaries
-
-```bash
-pnpm openclaw agent --agent main --message "I want to run a cleanup script. What shell commands am I allowed to run?"
-```
-
-**What happens:**
-1. Agent queries bash constraints via `QueryAuthorizationConstraints`
-2. Discovers allowed commands: `ls`, `cat`, `grep`, `find`, `echo`, `git status`, `git log`, `git diff`
-3. Discovers forbidden commands: `rm -rf`, `dd`, `mkfs`, `shutdown`, `reboot`, `curl | sh`
-4. Agent presents the allowed/denied command categories and asks what cleanup tasks you need
+2. Discovers that paths matching `*/openclaw-demo-protected/credentials/*` are forbidden by policy
+3. Agent explains upfront that it cannot access the credentials directory due to authorization policy
+4. No failed attempts — the agent knows the boundaries before trying, thanks to Cedar TPE
 
 #### Example: Mixed allow/deny in a single task
 
