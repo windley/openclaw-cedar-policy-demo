@@ -342,11 +342,26 @@ export async function runEmbeddedAttempt(
     });
     const ttsHint = params.config ? buildTtsSystemPromptHint(params.config) : undefined;
 
+    // Inject authorization guidance when query constraints tool is available
+    const authzPdp = params.config?.authz?.pdp;
+    const authzExtraPrompt =
+      authzPdp?.enabled && authzPdp.queryConstraintsEndpoint
+        ? [
+            params.extraSystemPrompt?.trim(),
+            "## Authorization Policy",
+            "This system uses Cedar authorization policies. You have a `query_authorization_constraints` tool available.",
+            "IMPORTANT: When you need to perform file operations (read, write, edit) or run commands (bash), use the `query_authorization_constraints` tool FIRST to discover what is permitted. Do NOT read policy files directly from disk to determine permissions - always use the tool, which queries the live policy decision point.",
+            "Pass the relevant action type: 'write', 'read', 'bash', or 'edit'.",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : params.extraSystemPrompt;
+
     const appendPrompt = buildEmbeddedSystemPrompt({
       workspaceDir: effectiveWorkspace,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
-      extraSystemPrompt: params.extraSystemPrompt,
+      extraSystemPrompt: authzExtraPrompt,
       ownerNumbers: params.ownerNumbers,
       reasoningTagHint,
       heartbeatPrompt: isDefaultAgent
