@@ -214,6 +214,7 @@ export const OpenClawSchema = z
             endpoint: z.string().optional(),
             timeoutMs: z.number().int().positive().optional(),
             failOpen: z.boolean().optional(),
+            queryConstraintsEndpoint: z.string().optional(),
           })
           .strict()
           .optional(),

@@ -16,7 +16,10 @@
       // Fail-open vs fail-closed behavior
       // false = fail-closed (deny on PDP errors) - RECOMMENDED for security
       // true = fail-open (allow on PDP errors) - use only for testing
-      failOpen: false
+      failOpen: false,
+
+      // TPE query-constraints endpoint for proactive policy discovery
+      queryConstraintsEndpoint: "http://localhost:8180/query-constraints"
     }
   }
 }

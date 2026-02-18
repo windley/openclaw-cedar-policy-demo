@@ -217,6 +217,73 @@ export async function authorizeTool(
 }
 
 /**
+ * Response from the TPE query-constraints endpoint.
+ */
+export type CedarQueryConstraintsResponse = {
+  /** TPE decision (typically "UNKNOWN" with residuals) */
+  decision: string;
+  /** Residual Cedar policies that express remaining constraints */
+  residuals: string[];
+  /** Human-readable explanation */
+  explanation?: string;
+};
+
+/**
+ * Query authorization constraints using Cedar TPE (Typed Partial Evaluation).
+ *
+ * Returns residual policies that describe what conditions must be met for
+ * an action to be allowed, without providing specific context values.
+ */
+export async function queryConstraints(
+  action: string,
+  config: { queryConstraintsEndpoint: string; timeoutMs?: number; agentId?: string },
+): Promise<CedarQueryConstraintsResponse> {
+  const timeoutMs = config.timeoutMs ?? 2000;
+  const agentId = config.agentId ?? "main";
+
+  // Build Cedar entity IDs matching the PDP server's expected format
+  const principal = `OpenClaw::Agent::"${agentId}"`;
+  const cedarAction = buildAction(action);
+  const resource = buildResource(action);
+
+  const request: CedarAuthzRequest = {
+    principal,
+    action: cedarAction,
+    resource,
+  };
+
+  log.debug(`TPE query: action=${action} principal=${principal}`);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(config.queryConstraintsEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "unknown error");
+      throw new Error(`TPE HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = (await response.json()) as CedarQueryConstraintsResponse;
+    log.debug(`TPE result: ${result.residuals.length} residual policies`);
+    return result;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    log.warn(`TPE query error: ${errorMsg}`);
+    throw new Error(`Authorization constraint query failed: ${errorMsg}`);
+  }
+}
+
+/**
  * Check if PDP is configured and enabled.
  */
 export function isPdpEnabled(config?: CedarPdpConfig | null): config is CedarPdpConfig {

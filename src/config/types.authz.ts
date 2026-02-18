@@ -25,5 +25,10 @@ export type AuthzConfig = {
      * When false (fail-closed), unreachable PDP will deny all tool executions.
      */
     failOpen?: boolean;
+    /**
+     * TPE query-constraints endpoint URL (e.g., "http://localhost:8180/query-constraints").
+     * Enables the query_authorization_constraints tool for proactive policy discovery.
+     */
+    queryConstraintsEndpoint?: string;
   };
 };
