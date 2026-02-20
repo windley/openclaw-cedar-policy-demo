@@ -32,7 +32,11 @@ The agent receives **constraint expressions** that describe the space of allowed
 
 This extends the basic architecture with a **planning phase** before execution. The code in this repo adds a `query_authorization_constraints` tool to OpenClaw that calls the PDP's TPE endpoint, receiving residual policies that describe what's allowed without specifying a concrete operation. The agent interprets these constraints and plans accordingly — then during execution, the PEP still validates each concrete operation as before.
 
-![Querying Constraints Architecture](querying_constraints.png)
+![Querying Constraints Flow](querying_constraints.png)
+
+The full agent loop with query constraints integrated looks like this:
+
+![Agent Loop with Query Constraints](agent_loop_with_qc.png)
 
 The key insight is that the planning phase and execution phase use *different* PDP endpoints: `/query-constraints` returns partial policy residuals (what *could* be allowed), while `/authorize` makes a concrete allow/deny decision for a specific operation. Together they give the agent both foresight and enforcement.
 
