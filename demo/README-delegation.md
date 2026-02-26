@@ -68,27 +68,7 @@ Cedar has no built-in clock or `now()` function. Time-based expiry (TTL) cannot 
 
 ### Architecture
 
-```
-┌─────────────┐     delegate_authorization     ┌──────────────────┐
-│  Main Agent │ ─────────────────────────────→  │ Delegation Store │
-│  (Agent)    │                                 │  (in-memory)     │
-└──────┬──────┘                                 └────────┬─────────┘
-       │ sessions_spawn                                  │
-       ▼                                                 │
-┌──────────────┐    tool call    ┌───────┐   lookup      │
-│  SubAgent    │ ──────────────→ │  PEP  │ ◄─────────────┘
-│  (SubAgent)  │                 │       │
-└──────────────┘                 └───┬───┘
-                                     │ 1. Check expiry (PEP)
-                                     │ 2. Check action scope (PEP)
-                                     │ 3. Inject delegation context
-                                     ▼
-                                ┌─────────┐
-                                │   PDP   │  Cedar policies evaluate:
-                                │ (Cedar) │  - isDelegated?
-                                └─────────┘  - delegatedActions.contains()?
-                                             - path/command constraints?
-```
+![Delegation Flow](delegation.png)
 
 ## Prerequisites
 
