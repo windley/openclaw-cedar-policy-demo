@@ -1,6 +1,11 @@
 import type { AnyAgentTool } from "./tools/common.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { authorizeTool } from "../authz/cedar-pdp-client.js";
+import {
+  getDelegation,
+  isDelegationExpired,
+  isSubagentSessionKey,
+} from "../authz/delegation-store.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { normalizeToolName } from "./tool-policy.js";
@@ -29,10 +34,59 @@ export async function runBeforeToolCallHook(args: {
   const params = args.params;
 
   // Check PDP authorization first (if enabled)
-  // Skip for query_authorization_constraints — it's a meta-tool about authorization
+  // Skip for query_authorization_constraints and delegate_authorization — meta-tools
   const pdpConfig = args.ctx?.config?.authz?.pdp;
-  if (pdpConfig?.enabled && pdpConfig.endpoint && toolName !== "query_authorization_constraints") {
+  const skipAuthzTools = ["query_authorization_constraints", "delegate_authorization"];
+  if (pdpConfig?.enabled && pdpConfig.endpoint && !skipAuthzTools.includes(toolName)) {
     try {
+      const sessionKey = args.ctx?.sessionKey ?? "";
+      const isSubAgent = isSubagentSessionKey(sessionKey);
+
+      // For subagents: check delegation before calling PDP
+      let delegation: {
+        isDelegated: boolean;
+        delegatedActions: string[];
+        delegatedPathPattern?: string;
+        delegatedCommandPattern?: string;
+      } | undefined;
+
+      if (isSubAgent) {
+        const record = getDelegation(sessionKey);
+
+        // No delegation record → deny immediately
+        if (!record) {
+          return {
+            blocked: true,
+            reason: "SubAgent has no delegation record — access denied",
+          };
+        }
+
+        // Expired delegation → deny immediately (PEP-enforced, no PDP call)
+        if (isDelegationExpired(record)) {
+          log.info(`Delegation expired: subagent=${sessionKey} id=${record.id}`);
+          return {
+            blocked: true,
+            reason: "Delegation has expired — access denied",
+          };
+        }
+
+        // Check if tool's action is in allowedActions (fast PEP check)
+        if (!record.allowedActions.includes(toolName)) {
+          return {
+            blocked: true,
+            reason: `Action "${toolName}" is not in delegation scope [${record.allowedActions.join(", ")}]`,
+          };
+        }
+
+        // Build delegation context for PDP
+        delegation = {
+          isDelegated: true,
+          delegatedActions: record.allowedActions,
+          delegatedPathPattern: record.pathPattern,
+          delegatedCommandPattern: record.commandPattern,
+        };
+      }
+
       const decision = await authorizeTool(
         {
           toolName,
@@ -40,6 +94,8 @@ export async function runBeforeToolCallHook(args: {
           toolCallId: args.toolCallId,
           agentId: args.ctx?.agentId,
           sessionKey: args.ctx?.sessionKey,
+          isSubAgent,
+          delegation,
         },
         {
           endpoint: pdpConfig.endpoint,

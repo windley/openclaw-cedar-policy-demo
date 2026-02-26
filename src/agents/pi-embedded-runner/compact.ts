@@ -327,11 +327,31 @@ export async function compactEmbeddedPiSessionDirect(
       moduleUrl: import.meta.url,
     });
     const ttsHint = params.config ? buildTtsSystemPromptHint(params.config) : undefined;
+
+    // Inject authorization guidance when query constraints tool is available
+    const authzPdp = params.config?.authz?.pdp;
+    const isSubagent = isSubagentSessionKey(params.sessionKey);
+    const authzExtraPrompt =
+      authzPdp?.enabled && authzPdp.queryConstraintsEndpoint
+        ? [
+            params.extraSystemPrompt?.trim(),
+            "## Authorization Policy",
+            "This system uses Cedar authorization policies. You have a `query_authorization_constraints` tool available.",
+            "IMPORTANT: When you need to perform file operations (read, write, edit) or run commands (bash), use the `query_authorization_constraints` tool FIRST to discover what is permitted. Do NOT read policy files directly from disk to determine permissions - always use the tool, which queries the live policy decision point.",
+            "Pass the relevant action type: 'write', 'read', 'bash', or 'edit'.",
+            isSubagent
+              ? "You are a delegated subagent. Your permissions are a restricted subset of the main agent's permissions. Use `query_authorization_constraints` to discover what you are allowed to do before attempting any operations. Do not assume you have the same access as the main agent."
+              : "When spawning subagents with `sessions_spawn`, use `delegate_authorization` FIRST to grant the subagent only the permissions it needs. Specify the subagent session key, allowed actions, and optionally a path or command pattern and TTL.",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : params.extraSystemPrompt;
+
     const appendPrompt = buildEmbeddedSystemPrompt({
       workspaceDir: effectiveWorkspace,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
-      extraSystemPrompt: params.extraSystemPrompt,
+      extraSystemPrompt: authzExtraPrompt,
       ownerNumbers: params.ownerNumbers,
       reasoningTagHint,
       heartbeatPrompt: isDefaultAgent

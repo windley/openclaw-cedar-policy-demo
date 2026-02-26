@@ -17,7 +17,25 @@ CEDAR_DIR = REPO_ROOT / "policies" / "cedar"
 SCHEMA = CEDAR_DIR / "schema.cedarschema"
 POLICIES = CEDAR_DIR / "policies.cedar"
 POLICIES_TPE = CEDAR_DIR / "policies-tpe.cedar"
+POLICIES_DELEGATION = CEDAR_DIR / "policies-delegation.cedar"
 ENTITIES = CEDAR_DIR / "entities.json"
+
+def build_combined_policies():
+    """Combine base policies with delegation policies (if present) into a temp file."""
+    content = POLICIES.read_text()
+    if POLICIES_DELEGATION.exists():
+        content += "\n\n" + POLICIES_DELEGATION.read_text()
+    return content
+
+# Build combined policies once at startup
+_combined_policies_content = build_combined_policies()
+
+def get_combined_policies_file():
+    """Write combined policies to a temp file and return the path."""
+    f = tempfile.NamedTemporaryFile(mode='w', suffix='.cedar', delete=False)
+    f.write(_combined_policies_content)
+    f.close()
+    return f.name
 
 class CedarPDPHandler(BaseHTTPRequestHandler):
     """HTTP handler for Cedar authorization requests."""
@@ -60,6 +78,8 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 json.dump(cedar_request, f)
                 request_file = f.name
 
+            # Use combined policies (base + delegation) for authorization
+            combined_policies_file = get_combined_policies_file()
             try:
                 # Call cedar CLI with --verbose to get policy IDs
                 result = subprocess.run(
@@ -67,7 +87,7 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                         'cedar', 'authorize',
                         '--verbose',
                         '--schema', str(SCHEMA),
-                        '--policies', str(POLICIES),
+                        '--policies', combined_policies_file,
                         '--entities', str(ENTITIES),
                         '--request-json', request_file
                     ],
@@ -90,14 +110,11 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 decision = "Allow" if "ALLOW" in result.stdout else "Deny"
 
                 # Extract policy IDs from verbose output
-                # Verbose output includes lines like "policy-1-allow-readonly" or "policy-3-deny-system-writes"
                 policy_ids = []
                 for line in result.stdout.split('\n'):
-                    # Look for lines containing policy IDs (format: policy-N-...)
-                    if 'policy-' in line.lower():
-                        # Extract policy ID from the line
+                    if 'policy-' in line.lower() or 'delegation-' in line.lower():
                         import re
-                        matches = re.findall(r'policy-[\w-]+', line, re.IGNORECASE)
+                        matches = re.findall(r'(?:policy|delegation)-[\w-]+', line, re.IGNORECASE)
                         policy_ids.extend(matches)
 
                 # Remove duplicates while preserving order
@@ -121,10 +138,14 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 # Log
                 tool = authz_request.get("resource", "").split("::")[- 1].strip('"')
                 action = authz_request.get("action", "").split("::")[- 1].strip('"')
-                print("[{}] {} - {}".format(decision, tool, action))
+                principal = authz_request.get("principal", "")
+                is_subagent = "SubAgent" in principal
+                prefix = "[{}]{}".format(decision, " [SubAgent]" if is_subagent else "")
+                print("{} {} - {}".format(prefix, tool, action))
 
             finally:
                 Path(request_file).unlink(missing_ok=True)
+                Path(combined_policies_file).unlink(missing_ok=True)
 
         except Exception as e:
             # Re-raise to be caught by outer handler
@@ -272,6 +293,8 @@ def main():
     print("Policies:   {}".format(POLICIES.relative_to(REPO_ROOT)))
     if POLICIES_TPE.exists():
         print("TPE Policies: {}".format(POLICIES_TPE.relative_to(REPO_ROOT)))
+    if POLICIES_DELEGATION.exists():
+        print("Delegation: {}".format(POLICIES_DELEGATION.relative_to(REPO_ROOT)))
     print("Entities:   {}".format(ENTITIES.relative_to(REPO_ROOT)))
     print()
     print("Endpoints:")

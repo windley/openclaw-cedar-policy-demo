@@ -16,6 +16,13 @@ namespace OpenClaw {
     "securityLevel"?: String,
   };
 
+  // SubAgent represents a delegated child agent spawned by a main Agent.
+  // SubAgents inherit from Agent but have narrower, explicitly delegated permissions.
+  entity SubAgent in [Agent] = {
+    // The session key of the agent that created this delegation
+    "delegatedBy"?: String,
+  };
+
   // Tool represents an executable tool in the OpenClaw system.
   // Tools are the resources being protected by authorization policies.
   entity Tool = {
@@ -32,55 +39,55 @@ namespace OpenClaw {
   // ToolExec namespace contains all tool execution actions.
   // Each tool type has a corresponding action (e.g., ToolExec::Bash, ToolExec::Read).
   action "ToolExec::Bash" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Read" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Write" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Edit" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Exec" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Process" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Glob" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::Grep" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
 
   action "ToolExec::ApplyPatch" appliesTo {
-    principal: [Agent],
+    principal: [Agent, SubAgent],
     resource: [Tool],
     context: ToolContext
   };
@@ -103,5 +110,15 @@ namespace OpenClaw {
 
     // Command string (for exec/bash tools) - optional for TPE queries
     "command"?: String,
+
+    // Delegation attributes (present when request is from a SubAgent)
+    // Whether this request is operating under a delegation grant
+    "isDelegated"?: Bool,
+    // Set of action names the delegation permits (e.g., ["read", "write"])
+    "delegatedActions"?: Set<String>,
+    // File path glob the delegation permits (e.g., "/tmp/*")
+    "delegatedPathPattern"?: String,
+    // Command glob the delegation permits (e.g., "git *")
+    "delegatedCommandPattern"?: String,
   };
 }

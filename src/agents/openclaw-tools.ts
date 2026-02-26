@@ -17,6 +17,7 @@ import { createSessionsListTool } from "./tools/sessions-list-tool.js";
 import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
 import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
+import { createDelegateAuthzTool } from "./tools/delegate-authz-tool.js";
 import { createQueryAuthzTool } from "./tools/query-authz-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 
@@ -141,16 +142,27 @@ export function createOpenClawTools(options?: {
     ...(imageTool ? [imageTool] : []),
   ];
 
-  // Add query authorization constraints tool when TPE endpoint is configured
+  // Add authorization tools when PDP is enabled
   const pdpConfig = options?.config?.authz?.pdp;
-  if (pdpConfig?.enabled && pdpConfig.queryConstraintsEndpoint) {
-    tools.push(
-      createQueryAuthzTool({
-        config: options?.config,
-        agentId: resolveSessionAgentId({
-          sessionKey: options?.agentSessionKey,
+  if (pdpConfig?.enabled) {
+    // Query constraints tool (requires TPE endpoint)
+    if (pdpConfig.queryConstraintsEndpoint) {
+      tools.push(
+        createQueryAuthzTool({
           config: options?.config,
+          agentId: resolveSessionAgentId({
+            sessionKey: options?.agentSessionKey,
+            config: options?.config,
+          }),
         }),
+      );
+    }
+
+    // Delegate authorization tool (for creating subagent delegations)
+    tools.push(
+      createDelegateAuthzTool({
+        config: options?.config,
+        agentSessionKey: options?.agentSessionKey,
       }),
     );
   }

@@ -23,6 +23,36 @@
   },
   {
     "uid": {
+      "type": "OpenClaw::SubAgent",
+      "id": "agent:main:subagent:demo-reader"
+    },
+    "attrs": {
+      "delegatedBy": "agent-abc123"
+    },
+    "parents": [
+      {
+        "type": "OpenClaw::Agent",
+        "id": "agent-abc123"
+      }
+    ]
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::SubAgent",
+      "id": "agent:main:subagent:demo-writer"
+    },
+    "attrs": {
+      "delegatedBy": "agent-abc123"
+    },
+    "parents": [
+      {
+        "type": "OpenClaw::Agent",
+        "id": "agent-abc123"
+      }
+    ]
+  },
+  {
+    "uid": {
       "type": "OpenClaw::Tool",
       "id": "bash"
     },

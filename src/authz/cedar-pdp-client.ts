@@ -66,6 +66,15 @@ export type ToolAuthzContext = {
   sessionKey?: string;
   /** Additional context attributes */
   attributes?: Record<string, unknown>;
+  /** Delegation context for subagent requests */
+  delegation?: {
+    isDelegated: boolean;
+    delegatedActions: string[];
+    delegatedPathPattern?: string;
+    delegatedCommandPattern?: string;
+  };
+  /** If true, use SubAgent principal type instead of Agent */
+  isSubAgent?: boolean;
 };
 
 /**
@@ -84,9 +93,9 @@ export type AuthzDecision = {
  * Build a Cedar principal identifier from agent context.
  */
 function buildPrincipal(ctx: ToolAuthzContext): string {
-  // Use agentId if available, otherwise use sessionKey, otherwise use "unknown"
   const identifier = ctx.agentId || ctx.sessionKey || "unknown";
-  return `OpenClaw::Agent::"${identifier}"`;
+  const entityType = ctx.isSubAgent ? "SubAgent" : "Agent";
+  return `OpenClaw::${entityType}::"${identifier}"`;
 }
 
 /**
@@ -123,6 +132,18 @@ function buildContext(ctx: ToolAuthzContext): Record<string, unknown> {
   // Add session context
   if (ctx.sessionKey) {
     context.sessionKey = ctx.sessionKey;
+  }
+
+  // Add delegation context for subagent requests
+  if (ctx.delegation) {
+    context.isDelegated = ctx.delegation.isDelegated;
+    context.delegatedActions = ctx.delegation.delegatedActions;
+    if (ctx.delegation.delegatedPathPattern) {
+      context.delegatedPathPattern = ctx.delegation.delegatedPathPattern;
+    }
+    if (ctx.delegation.delegatedCommandPattern) {
+      context.delegatedCommandPattern = ctx.delegation.delegatedCommandPattern;
+    }
   }
 
   return context;
