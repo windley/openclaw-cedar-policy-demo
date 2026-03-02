@@ -33,6 +33,8 @@ If you want a personal, single-user assistant that feels local, fast, and always
 - ✅ Allow safe operations (read user files, write to `/tmp`, run `git status`)
 - ❌ Deny dangerous operations (write to `/etc`, run `rm -rf`, read SSH keys)
 - 🤖 Agent explains denials and suggests alternatives
+- 🔍 **[Proactive authorization](demo/README-query-constraints.md)** — agent queries what's allowed *before* acting (Cedar TPE)
+- 🔗 **[Delegation-as-data](demo/README-delegation.md)** — main agent grants narrower permissions to subagents
 
 **Quick start:**
 ```bash
@@ -58,6 +60,8 @@ jupyter notebook cedar-authorization-demo.ipynb
 - **[demo/README.md](demo/README.md)** - Complete guide with architecture, quickstart, scripts, and live agent testing
 - **[demo/cedar-authorization-demo.ipynb](demo/cedar-authorization-demo.ipynb)** - Interactive Jupyter notebook
 - **[policies/cedar/](policies/cedar/)** - Cedar schema, policies, and entities
+- **[demo/README-query-constraints.md](demo/README-query-constraints.md)** - Proactive authorization with Cedar TPE
+- **[demo/README-delegation.md](demo/README-delegation.md)** - Delegation-as-data for multi-agent authorization
 
 ---
 

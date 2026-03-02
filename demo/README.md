@@ -345,6 +345,18 @@ Instead of trial-and-error, the agent learns from the residual policies that wri
 
 See the [full TPE demo](README-query-constraints.md) for setup, examples, and trade-offs.
 
+### Step 9: Delegation-as-Data for Multi-Agent Authorization (Optional)
+
+For **multi-agent scenarios**, where a main agent spawns subagents with narrower permissions, see the [Delegation Demo](README-delegation.md).
+
+The main agent calls `delegate_authorization` to create a scoped delegation record, then spawns a subagent. Cedar policies enforce that the subagent can only act within the delegated bounds — even if it tries to exceed them.
+
+```bash
+pnpm openclaw agent --agent main --message "Spawn a read-only subagent to summarize files in /tmp."
+```
+
+See the [full delegation demo](README-delegation.md) for setup, policies, and examples.
+
 ---
 
 ## Alternative: Interactive Exploration with Jupyter
@@ -667,5 +679,6 @@ cedar authorize \
 2. **Run the notebook** - Try [cedar-authorization-demo.ipynb](cedar-authorization-demo.ipynb)
 3. **Test with agent** - Follow the Quick Start above
 4. **Try proactive authorization** - See the [Query Constraints Demo](README-query-constraints.md) for Cedar TPE
-5. **Modify policies** - Add your own authorization rules
-6. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config
+5. **Try multi-agent delegation** - See the [Delegation Demo](README-delegation.md) for subagent permission scoping
+6. **Modify policies** - Add your own authorization rules
+7. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config
