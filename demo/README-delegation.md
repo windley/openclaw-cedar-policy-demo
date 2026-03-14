@@ -240,25 +240,150 @@ delegate_authorization({
 
 ## Implementation Details
 
-### New Files
+### 1. Delegation Store (`src/authz/delegation-store.ts`)
 
-| File | Purpose |
-|------|---------|
-| `policies/cedar/policies-delegation.cedar` | Delegation-aware Cedar policies |
-| `src/authz/delegation-store.ts` | In-memory delegation record store |
-| `src/agents/tools/delegate-authz-tool.ts` | `delegate_authorization` tool |
-| `demo/test-delegation.py` | Test script |
+**New file** — in-memory store keyed by subagent session key:
 
-### Modified Files
+```typescript
+export type DelegationRecord = {
+  id: string;
+  delegatorSessionKey: string;
+  subagentSessionKey: string;
+  allowedActions: string[];
+  pathPattern?: string;
+  commandPattern?: string;
+  expiresAt?: number;  // enforced by PEP — Cedar has no now()
+  createdAt: number;
+};
 
-| File | Change |
-|------|--------|
-| `policies/cedar/schema.cedarschema` | Added `SubAgent` entity, delegation context attributes |
-| `policies/cedar/entities.json` | Added sample `SubAgent` entities |
-| `src/authz/cedar-pdp-client.ts` | `SubAgent` principal support, delegation context merging |
-| `src/agents/pi-tools.before-tool-call.ts` | PEP delegation checks (expiry, scope, context injection) |
-| `src/agents/openclaw-tools.ts` | Register `delegate_authorization` tool |
-| `demo/cedar-pdp-server.py` | Load delegation policies alongside base policies |
+export function createDelegation(record: Omit<DelegationRecord, "id" | "createdAt">): DelegationRecord
+export function getDelegation(subagentSessionKey: string): DelegationRecord | undefined
+export function isDelegationExpired(record: DelegationRecord): boolean
+```
+
+**Key responsibilities:**
+- Stores delegation records created by `delegate_authorization`
+- Provides lookup by subagent session key (used by the PEP on every tool call)
+- Expiry check is here — not in Cedar — because Cedar has no `now()` function
+
+### 2. Agent Tool: `delegate_authorization` (`src/agents/tools/delegate-authz-tool.ts`)
+
+**New file** — tool the main agent calls before spawning a subagent:
+
+```typescript
+{
+  name: "delegate_authorization",
+  description: "Create a delegation record granting a subagent specific permissions. Use before sessions_spawn to scope what the subagent can do.",
+  parameters: {
+    subagentSessionKey: string,   // session key of the subagent to be spawned
+    allowedActions: string[],     // e.g. ["read", "glob", "grep"]
+    pathPattern?: string,         // e.g. "/tmp/*"
+    commandPattern?: string,      // e.g. "git *"
+    ttlSeconds?: number           // optional expiry
+  }
+}
+```
+
+**Tool output:**
+
+```json
+{
+  "delegationId": "a3f1c2d4-...",
+  "subagentSessionKey": "agent:main:subagent:reader-1",
+  "allowedActions": ["read", "glob", "grep"],
+  "pathPattern": "/tmp/*",
+  "commandPattern": null,
+  "expiresAt": "2024-01-15T12:05:00.000Z",
+  "message": "Delegation created. The subagent can now perform the specified actions."
+}
+```
+
+### 3. Policy Enforcement Point (`src/agents/pi-tools.before-tool-call.ts`)
+
+**Modified** to add delegation checks before each Cedar PDP call for subagents:
+
+```typescript
+if (isSubAgent) {
+  const record = getDelegation(sessionKey);
+
+  // No delegation record → deny immediately (no PDP call)
+  if (!record) {
+    return { blocked: true, reason: "SubAgent has no delegation record — access denied" };
+  }
+
+  // Expired → deny immediately (PEP-enforced, Cedar has no now())
+  if (isDelegationExpired(record)) {
+    return { blocked: true, reason: "Delegation has expired — access denied" };
+  }
+
+  // Action not in delegation scope → deny immediately
+  if (!record.allowedActions.includes(toolName)) {
+    return { blocked: true, reason: `Action "${toolName}" is not in delegation scope` };
+  }
+
+  // Inject delegation context for Cedar policy evaluation
+  delegation = {
+    isDelegated: true,
+    delegatedActions: record.allowedActions,
+    delegatedPathPattern: record.pathPattern,
+    delegatedCommandPattern: record.commandPattern,
+  };
+}
+```
+
+**Key points:**
+- Three fast-path denials run before Cedar is called (no delegation, expired, out-of-scope action)
+- Surviving requests inject delegation context so Cedar policies can enforce path/command patterns
+- Uses `SubAgent` principal type instead of `Agent` for Cedar evaluation
+
+### 4. Cedar Policies (`policies/cedar/policies-delegation.cedar`)
+
+**New file** — five policies that only match `principal is OpenClaw::SubAgent`:
+
+```cedar
+// Allow delegated actions that are in scope
+@id("delegation-1-allow-delegated-actions")
+permit(principal is OpenClaw::SubAgent, action, resource)
+when { context has isDelegated && context.isDelegated && ... };
+
+// Deny file ops outside the delegated path pattern
+@id("delegation-2-enforce-path-constraint")
+forbid(principal is OpenClaw::SubAgent, action, resource)
+when { context has delegatedPathPattern && !(context.filePath like context.delegatedPathPattern) };
+
+// Deny bash/exec outside the delegated command pattern
+@id("delegation-3-enforce-command-constraint")
+forbid(principal is OpenClaw::SubAgent, action, resource)
+when { context has delegatedCommandPattern && !(context.command like context.delegatedCommandPattern) };
+
+// Deny all SubAgent actions with no valid delegation (catch-all)
+@id("delegation-4-deny-undelegated-subagents")
+forbid(principal is OpenClaw::SubAgent, action, resource)
+when { !(context has isDelegated) || !context.isDelegated };
+
+// Deny SubAgent actions not listed in delegatedActions (overrides base permits)
+@id("delegation-5-deny-out-of-scope-actions")
+forbid(principal is OpenClaw::SubAgent, action, resource)
+when { ... };
+```
+
+Main `Agent` principals are completely unaffected by these policies.
+
+### 5. Cedar Schema (`policies/cedar/schema.cedarschema`)
+
+**Modified** to add the `SubAgent` entity type and delegation context attributes:
+
+```
+entity SubAgent;
+
+context {
+  isDelegated?: Bool,
+  delegatedActions?: Set<String>,
+  delegatedPathPattern?: String,
+  delegatedCommandPattern?: String,
+  // ... existing attributes
+}
+```
 
 ## Resources
 
