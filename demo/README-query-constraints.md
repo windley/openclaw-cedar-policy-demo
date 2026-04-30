@@ -340,6 +340,62 @@ Looking at the residual policies, the agent understands:
 - "I'll use 'ls -la' to list files"
 - Executes bash successfully on first try
 
+## Reading Residual Policies in the Logs
+
+When you run the agent with the PDP server's log window open, you'll see the raw Cedar residuals for each `query_authorization_constraints` call. Here's how to interpret what you see.
+
+### The Residual Interpretation Table
+
+| Residual condition | Meaning |
+|---|---|
+| `forbid when { false }` | Policy eliminated — can never fire for this principal/action/resource |
+| `forbid when { true }` | Unconditional deny — always blocks, regardless of context |
+| `forbid when { <expr> }` | Conditional deny — blocks when context satisfies the expression |
+| `permit when { false }` | Policy eliminated — can never grant for this principal/action/resource |
+| `permit when { true }` | Unconditional allow |
+| `permit when { <expr> }` | Conditional allow — grants when context satisfies the expression |
+
+### The `false` Residual
+
+The most common surprise is seeing residuals like this:
+
+```cedar
+@id("policy-7-deny-credential-files")
+forbid(
+  principal,
+  action,
+  resource
+) when {
+  false
+};
+```
+
+**This policy is not in play at all.** Cedar's partial evaluator resolved the principal, action, and resource components of the policy without needing context, and determined the conditions can never be satisfied for this query. It's telling you this policy is irrelevant — you can ignore it.
+
+TPE includes these eliminated policies in the residual output so you can see every policy it considered, not just the active ones. The residuals you actually need to act on are the ones with real expressions in their `when` clause.
+
+### What to Focus On
+
+When scanning the logs, filter your attention:
+
+1. **`forbid when { <expr> }` residuals** — these are your hard constraints. The expression describes exactly what context values will trigger a deny.
+2. **`permit when { <expr> }` residuals** — these describe the space of allowed operations. Context must satisfy at least one of these (and none of the forbids) for a permit.
+3. **`* when { false }` residuals** — noise from TPE's exhaustive output; skip them.
+4. **`forbid when { true }` residuals** — a red flag. An unconditional deny means the agent can never perform this action type regardless of context.
+
+### Example Log Output
+
+A write constraint query might produce logs like:
+
+```
+policy-1-allow-agent: permit when { true }          ← agent is always a valid principal
+policy-2-allow-tmp-writes: permit when { (context has filePath) && (...filePath like "/tmp/*"...) }  ← actionable
+policy-3-deny-system-writes: forbid when { (context has filePath) && (...filePath like "/etc/*"...) } ← actionable
+policy-7-deny-credential-files: forbid when { false }  ← eliminated, ignore
+```
+
+The agent reads these residuals and concludes: "I can write to `/tmp/*`, I cannot write to `/etc/*`, and the credential-file policy doesn't apply to write operations at all."
+
 ## Benefits of Query Constraints
 
 ### Efficiency
