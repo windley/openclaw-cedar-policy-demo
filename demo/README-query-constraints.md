@@ -84,6 +84,12 @@ The PDP server now supports two endpoints:
 - `POST /authorize` - Standard authorization (basic demo)
 - `POST /query-constraints` - TPE constraint queries (this demo)
 
+Make sure the PDP server is running before testing (if not already started from Step 1):
+
+```bash
+python3 demo/cedar-pdp-server.py
+```
+
 Test the TPE endpoint:
 
 ```bash
@@ -135,7 +141,7 @@ Results: 3 passed, 0 failed
 The agent now has a built-in `query_authorization_constraints` tool. When the PDP is enabled and `queryConstraintsEndpoint` is configured, the tool is automatically available. Run:
 
 ```bash
-pnpm openclaw agent --agent main --message "I want to create a file with the content 'Hello World!'. Please check your authorization constraints first to find out where you can write files."
+pnpm openclaw agent --agent main --message "I want to create a file with the content 'Hello World'. Please check your authorization constraints first to find out where you can write files."
 ```
 
 **What happens:**
@@ -143,7 +149,7 @@ pnpm openclaw agent --agent main --message "I want to create a file with the con
 2. Receives residual policies showing `/tmp/*` or `/var/tmp/*` are allowed
 3. Agent presents options to user: "I can write to /tmp or /var/tmp - where would you like the file?"
 4. User chooses location (e.g., `/tmp/hello.txt`)
-5. Agent executes write with content "Hello World!", which succeeds (already knows it's allowed)
+5. Agent executes write with content "Hello World", which succeeds (already knows it's allowed)
 
 **Compare to basic demo:**
 - Basic: Agent tries `/etc`, fails, learns, tries `/tmp`, succeeds (2 attempts, no user choice)
