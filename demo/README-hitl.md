@@ -99,6 +99,71 @@ python3 demo/test-delegation.py
 
 The PEP injects `humanApproval`. The agent cannot supply it. Timeout lives in the PEP because Cedar has no `now()`.
 
+## Park vs replan
+
+`/authorize` returns only Allow or Deny. It does not say “park” or “do not replan.” Replan is what the **model** does after a denied tool result comes back. Park means the PEP has **not returned that result yet**: `runBeforeToolCallHook` is still waiting, so there is nothing in the transcript to replan from.
+
+This demo parks after a Cedar deny when all of the following are true:
+
+- the tool is `send_email`
+- a HITL endpoint is resolvable (`hitlEndpoint`, or the PDP origin)
+- email fields and a request hash are present
+
+`hitl-2` only forbids `SendEmail` without injected approval. It does not tell the PEP to wait. If Cedar denied some other tool the same way, the hook would return immediately and the agent would replan, as in the earlier demos.
+
+Timeout or a second `/authorize` deny then unblocks the hook with a tool error. **That** is when replan can happen. The wait itself is not retried.
+
+## Generalizing beyond send_email
+
+Keying park on `send_email` is enough for this demo. A general PEP should park on an **obligation attached to the deny**, not the tool name.
+
+The PDP already returns determining policy IDs in `diagnostics.reason`. Annotate the missing-approval forbid so the HTTP layer can turn that into an obligation:
+
+```cedar
+@id("hitl-2-forbid-send-without-approval")
+@pep("hitl")
+@hitlMethod("webauthn")
+@hitlBind("requestHash")
+forbid(
+  principal,
+  action == OpenClaw::Action::"ToolExec::SendEmail",
+  resource
+)
+when { /* approval missing or not bound to this request */ };
+```
+
+Example `/authorize` deny:
+
+```json
+{
+  "decision": "Deny",
+  "diagnostics": { "reason": ["hitl-2-forbid-send-without-approval"] },
+  "obligations": [{
+    "type": "hitl",
+    "method": "webauthn",
+    "bind": ["requestHash"],
+    "display": ["emailTo", "emailSubject", "emailBody"]
+  }]
+}
+```
+
+Then the PEP is generic:
+
+- **Deny, no HITL obligation** — return the error; the model replans
+- **Deny + HITL obligation, first time** — hash the `bind` fields, park on `/approver`, inject `humanApproval`, call `/authorize` again
+- **Deny after a wait** — hard deny; no second wait (timeout, hash mismatch, or any other forbid still in force)
+
+Park only when the *missing-approval* policy is why it failed, and only once per `toolCallId`. Parking on “any deny of a risky tool” would also park a “no email to vendors” forbid; a human would tap and Cedar would still deny.
+
+What else lifts out of `send_email`:
+
+- **Hash input** comes from `bind`, not a hardcoded `{to, subject, body, toolName}`
+- **Approver page** renders `display` attributes for whatever action is pending
+- **Schema** already has optional `humanApproval` on context; new gated actions reuse it instead of a PEP allowlist
+- **`query-constraints`** can tell the model “this will need a human,” but that is UX. Enforcement stays the park-on-obligation path so the agent cannot skip it
+
+Cedar does not need a third decision. The demo’s `isSendEmailTool` check is a stand-in for “this deny carries a HITL obligation I have not already discharged.”
+
 ## Mailbox sink
 
 Approved sends write JSON to `demo/mailbox/sent/`:
@@ -120,5 +185,5 @@ Colons are stripped from the filename so successive sends stay distinct and easy
 - Approver UI: `demo/hitl/static/` served at `/approver`
 - Pending store + WebAuthn: `demo/hitl/`
 - Tool: `src/agents/tools/send-email-tool.ts`
-- PEP park/wait: `src/agents/pi-tools.before-tool-call.ts`
+- PEP park/wait: `src/agents/pi-tools.before-tool-call.ts` (demo-specific: parks on `send_email`; see [Generalizing beyond send_email](#generalizing-beyond-send_email))
 - Policies: `policies/cedar/policies-hitl.cedar`
