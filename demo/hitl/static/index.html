@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw HITL Approver</title>
+    <link rel="stylesheet" href="/approver/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">OpenClaw Cedar demo</p>
+        <h1>Human-in-the-loop approver</h1>
+        <p class="lede">
+          Pending email sends wait here until you attest with a roaming
+          passkey. Prefer a Yubikey (or other hardware key) at registration
+          so the tap is physical, not a software-stored passkey. There is no
+          notification — refresh or leave this page open. Timeout is a hard
+          deny.
+        </p>
+      </header>
+
+      <section id="register-panel">
+        <h2>Yubikey</h2>
+        <p id="register-status">Checking registration…</p>
+        <button type="button" id="register-btn">Register Yubikey</button>
+      </section>
+
+      <section>
+        <h2>Pending sends</h2>
+        <p id="pending-empty" class="muted">No pending sends.</p>
+        <div id="pending-list"></div>
+      </section>
+
+      <section>
+        <h2>Sent mailbox</h2>
+        <p class="muted">Files in <code>demo/mailbox/sent/</code></p>
+        <p id="sent-empty" class="muted">No messages sent yet.</p>
+        <div id="sent-list"></div>
+      </section>
+    </main>
+    <script src="/approver/app.js"></script>
+  </body>
+</html>

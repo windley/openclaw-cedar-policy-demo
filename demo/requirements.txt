@@ -1,0 +1,2 @@
+requests>=2.31.0
+webauthn>=2.2.0

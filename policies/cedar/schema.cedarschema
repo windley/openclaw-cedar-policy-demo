@@ -92,9 +92,22 @@ namespace OpenClaw {
     context: ToolContext
   };
 
+  action "ToolExec::SendEmail" appliesTo {
+    principal: [Agent, SubAgent],
+    resource: [Tool],
+    context: ToolContext
+  };
+
   //
   // Context Schema
   //
+
+  // Verified human approval injected by the PEP after WebAuthn (never by the agent).
+  type HumanApproval = {
+    "verified": Bool,
+    "method": String,
+    "requestHash": String,
+  };
 
   // ToolContext provides runtime information about the tool execution request.
   // This context can be used in policy conditions to make fine-grained authorization decisions.
@@ -110,6 +123,17 @@ namespace OpenClaw {
 
     // Command string (for exec/bash tools) - optional for TPE queries
     "command"?: String,
+
+    // Simulated email fields (send_email tool)
+    "emailTo"?: String,
+    "emailSubject"?: String,
+    "emailBody"?: String,
+
+    // Hash of the send being authorized; must match humanApproval.requestHash
+    "requestHash"?: String,
+
+    // Present only when the PEP has verified a Yubikey assertion for this request
+    "humanApproval"?: HumanApproval,
 
     // Delegation attributes (present when request is from a SubAgent)
     // Whether this request is operating under a delegation grant

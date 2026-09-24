@@ -19,7 +19,11 @@
       failOpen: false,
 
       // TPE query-constraints endpoint for proactive policy discovery
-      queryConstraintsEndpoint: "http://localhost:8180/query-constraints"
+      queryConstraintsEndpoint: "http://localhost:8180/query-constraints",
+
+      // Human-in-the-loop approver (Yubikey page served by the PDP server)
+      hitlEndpoint: "http://localhost:8180",
+      hitlTimeoutMs: 180000
     }
   }
 }

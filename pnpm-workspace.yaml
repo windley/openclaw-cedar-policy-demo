@@ -4,7 +4,7 @@ packages:
   - packages/*
   - extensions/*
 
-minimumReleaseAge: "2880 minutes"
+minimumReleaseAge: 2880
 
 overrides:
   fast-xml-parser: "5.3.4"

@@ -35,6 +35,7 @@ If you want a personal, single-user assistant that feels local, fast, and always
 - 🤖 Agent explains denials and suggests alternatives
 - 🔍 **[Proactive authorization](demo/README-query-constraints.md)** — agent queries what's allowed *before* acting (Cedar TPE)
 - 🔗 **[Delegation-as-data](demo/README-delegation.md)** — main agent grants narrower permissions to subagents
+- 🔐 **[Human-in-the-loop email](demo/README-hitl.md)** — Yubikey approval before a simulated send
 
 **Quick start:**
 ```bash

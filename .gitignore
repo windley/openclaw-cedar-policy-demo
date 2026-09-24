@@ -81,3 +81,8 @@ __pycache__/
 # Jupyter notebooks
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
+
+# HITL demo: simulated mailbox contents and registered Yubikey
+demo/mailbox/sent/*.json
+demo/hitl/.webauthn-credentials.json
+demo/.venv/

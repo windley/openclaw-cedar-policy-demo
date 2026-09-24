@@ -357,6 +357,28 @@ pnpm openclaw agent --agent main --message "Spawn a read-only subagent to summar
 
 See the [full delegation demo](README-delegation.md) for setup, policies, and examples.
 
+### Step 10: Human-in-the-Loop Email Send with Yubikey (Optional)
+
+For a **hard human-in-the-loop**, where sending email requires a Yubikey tap bound to that message, see the [HITL Demo](README-hitl.md).
+
+The agent may draft freely. `send_email` parks until you approve it at [http://localhost:8180/approver](http://localhost:8180/approver). Approval is WebAuthn/passkeys; for a physical human gate, store the passkey on a Yubikey, not a software authenticator. Timeout is a hard deny. Delivery writes a datetime-named JSON file under `demo/mailbox/sent/`.
+
+If you already copied `openclaw.json5` into `~/.openclaw/openclaw.json` before this demo, add:
+
+```json5
+hitlEndpoint: "http://localhost:8180",
+hitlTimeoutMs: 180000
+```
+
+under `authz.pdp`. The PEP also falls back to the PDP origin (`http://localhost:8180`) when `hitlEndpoint` is omitted.
+
+```bash
+pnpm openclaw agent --agent main --message \
+  "Send a simulated email to alex@example.com with subject 'Weekly summary'."
+```
+
+See the [full HITL demo](README-hitl.md) for setup, policies, and the mailbox sink.
+
 ---
 
 ## Alternative: Interactive Exploration with Jupyter
@@ -680,5 +702,6 @@ cedar authorize \
 3. **Test with agent** - Follow the Quick Start above
 4. **Try proactive authorization** - See the [Query Constraints Demo](README-query-constraints.md) for Cedar TPE
 5. **Try multi-agent delegation** - See the [Delegation Demo](README-delegation.md) for subagent permission scoping
-6. **Modify policies** - Add your own authorization rules
-7. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config
+6. **Try Yubikey HITL** - See the [HITL Demo](README-hitl.md) for mandatory human approval on email send
+7. **Modify policies** - Add your own authorization rules
+8. **Integrate with your workflow** - Deploy PDP server and enable in OpenClaw config

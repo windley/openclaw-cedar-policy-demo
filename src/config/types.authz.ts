@@ -30,5 +30,15 @@ export type AuthzConfig = {
      * Enables the query_authorization_constraints tool for proactive policy discovery.
      */
     queryConstraintsEndpoint?: string;
+    /**
+     * HITL approver base URL (e.g., "http://localhost:8180").
+     * When set, denied send_email calls park until a Yubikey tap or timeout.
+     */
+    hitlEndpoint?: string;
+    /**
+     * How long to wait for Yubikey approval in milliseconds (default: 180000).
+     * Timeout is a hard deny with no retry of the wait.
+     */
+    hitlTimeoutMs?: number;
   };
 };

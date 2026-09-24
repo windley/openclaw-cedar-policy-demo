@@ -5,11 +5,21 @@ Simple Cedar PDP HTTP server for OpenClaw authorization demo.
 This server wraps the Cedar CLI and provides an HTTP API for authorization requests.
 """
 import json
+import mimetypes
 import subprocess
 import sys
 import tempfile
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from hitl.store import ApprovalStore
+
+try:
+    from hitl.webauthn_flow import WebAuthnManager
+except ImportError:
+    WebAuthnManager = None
 
 # Paths
 REPO_ROOT = Path(__file__).parent.parent
@@ -18,13 +28,23 @@ SCHEMA = CEDAR_DIR / "schema.cedarschema"
 POLICIES = CEDAR_DIR / "policies.cedar"
 POLICIES_TPE = CEDAR_DIR / "policies-tpe.cedar"
 POLICIES_DELEGATION = CEDAR_DIR / "policies-delegation.cedar"
+POLICIES_HITL = CEDAR_DIR / "policies-hitl.cedar"
 ENTITIES = CEDAR_DIR / "entities.json"
+HITL_DIR = Path(__file__).parent / "hitl"
+STATIC_DIR = HITL_DIR / "static"
+MAILBOX_DIR = Path(__file__).parent / "mailbox" / "sent"
+CREDENTIALS_PATH = HITL_DIR / ".webauthn-credentials.json"
+
+APPROVALS = ApprovalStore()
+WEBAUTHN = WebAuthnManager(CREDENTIALS_PATH) if WebAuthnManager else None
 
 def build_combined_policies():
-    """Combine base policies with delegation policies (if present) into a temp file."""
+    """Combine base policies with optional demo policy files into a temp file."""
     content = POLICIES.read_text()
     if POLICIES_DELEGATION.exists():
         content += "\n\n" + POLICIES_DELEGATION.read_text()
+    if POLICIES_HITL.exists():
+        content += "\n\n" + POLICIES_HITL.read_text()
     return content
 
 # Build combined policies once at startup
@@ -49,12 +69,19 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
         try:
             request_data = json.loads(body)
 
-            if self.path == "/authorize":
+            parsed = urlparse(self.path)
+            if parsed.path == "/authorize":
                 self._handle_authorize(request_data)
-            elif self.path == "/query-constraints":
+            elif parsed.path == "/query-constraints":
                 self._handle_query_constraints(request_data)
+            elif parsed.path == "/approvals":
+                self._handle_create_approval(request_data)
+            elif parsed.path == "/webauthn/register/verify":
+                self._handle_register_verify(request_data)
+            elif parsed.path == "/webauthn/authenticate/verify":
+                self._handle_authenticate_verify(request_data)
             else:
-                self.send_error(404, "Not Found - use POST /authorize or /query-constraints")
+                self.send_error(404, "Not Found")
 
         except Exception as e:
             error_msg = str(e)
@@ -112,9 +139,9 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
                 # Extract policy IDs from verbose output
                 policy_ids = []
                 for line in result.stdout.split('\n'):
-                    if 'policy-' in line.lower() or 'delegation-' in line.lower():
+                    if 'policy-' in line.lower() or 'delegation-' in line.lower() or 'hitl-' in line.lower():
                         import re
-                        matches = re.findall(r'(?:policy|delegation)-[\w-]+', line, re.IGNORECASE)
+                        matches = re.findall(r'(?:policy|delegation|hitl)-[\w-]+', line, re.IGNORECASE)
                         policy_ids.extend(matches)
 
                 # Remove duplicates while preserving order
@@ -245,18 +272,145 @@ class CedarPDPHandler(BaseHTTPRequestHandler):
         print("[TPE Query] {} - returned {} residual policies".format(action, len(residuals)))
 
     def do_GET(self):
-        """Handle GET requests (health check)."""
-        if self.path == "/health":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok"}).encode('utf-8'))
+        """Handle GET requests (health, approver UI, HITL APIs)."""
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+
+        if path == "/health":
+            self._send_json({"status": "ok"})
+        elif path in ("/approver", "/approver/"):
+            self._serve_static("index.html")
+        elif path.startswith("/approver/"):
+            self._serve_static(path[len("/approver/"):])
+        elif path == "/approvals":
+            self._send_json({"items": APPROVALS.list_pending()})
+        elif path.endswith("/wait") and path.startswith("/approvals/"):
+            approval_id = path[len("/approvals/"):-len("/wait")].strip("/")
+            self._send_json(APPROVALS.wait(approval_id))
+        elif path == "/mailbox":
+            self._send_json({"items": list_mailbox()})
+        elif path == "/webauthn/status":
+            if not self._require_webauthn():
+                return
+            self._send_json(WEBAUTHN.status())
+        elif path == "/webauthn/register/options":
+            if not self._require_webauthn():
+                return
+            self._send_json(WEBAUTHN.registration_options())
+        elif path == "/webauthn/authenticate/options":
+            if not self._require_webauthn():
+                return
+            approval_id = (query.get("approvalId") or [None])[0]
+            record = APPROVALS.get(approval_id) if approval_id else None
+            if record is None or record["status"] != "pending":
+                self._send_json({"error": "no pending approval"}, status=404)
+                return
+            self._send_json(WEBAUTHN.authentication_options(record["requestHash"]))
         else:
-            self.send_error(404, "Not Found - use POST /authorize or GET /health")
+            self.send_error(404, "Not Found")
+
+    def _handle_create_approval(self, request_data):
+        request_hash = request_data.get("requestHash")
+        if not request_hash:
+            self._send_json({"error": "requestHash required"}, status=400)
+            return
+        record = APPROVALS.create(
+            email_to=request_data.get("to") or "",
+            subject=request_data.get("subject") or "",
+            body=request_data.get("body") or "",
+            request_hash=request_hash,
+            agent_id=request_data.get("agentId") or "unknown",
+            tool_call_id=request_data.get("toolCallId") or "unknown",
+            timeout_ms=int(request_data.get("timeoutMs") or 180000),
+        )
+        print("[HITL] pending send {} to={} subject={}".format(
+            record["id"], record["to"], record["subject"],
+        ))
+        self._send_json(record, status=201)
+
+    def _handle_register_verify(self, request_data):
+        if not self._require_webauthn():
+            return
+        try:
+            result = WEBAUTHN.verify_registration(request_data)
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=400)
+            return
+        print("[HITL] Yubikey registered")
+        self._send_json(result)
+
+    def _handle_authenticate_verify(self, request_data):
+        if not self._require_webauthn():
+            return
+        approval_id = request_data.get("approvalId")
+        record = APPROVALS.get(approval_id) if approval_id else None
+        if record is None or record["status"] != "pending":
+            self._send_json({"error": "no pending approval"}, status=404)
+            return
+        try:
+            WEBAUTHN.verify_authentication(
+                request_data.get("credential") or {},
+                record["requestHash"],
+            )
+            approved = APPROVALS.approve(approval_id, record["requestHash"])
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=400)
+            return
+        print("[HITL] approved send {} to={}".format(approved["id"], approved["to"]))
+        self._send_json({"verified": True, "approval": approved})
+
+    def _require_webauthn(self):
+        if WEBAUTHN is None:
+            self._send_json(
+                {"error": "Python package 'webauthn' is not installed. pip3 install webauthn"},
+                status=503,
+            )
+            return False
+        return True
+
+    def _send_json(self, payload, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(json.dumps(payload).encode("utf-8"))
+
+    def _serve_static(self, relative):
+        target = (STATIC_DIR / relative).resolve()
+        if not str(target).startswith(str(STATIC_DIR.resolve())) or not target.is_file():
+            self.send_error(404, "Not Found")
+            return
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        data = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
 
     def log_message(self, format, *args):
         """Suppress default HTTP logging (we have custom logging)."""
         pass
+
+class ThreadingPDPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
+
+def list_mailbox():
+    """List simulated sent messages for the approver page."""
+    MAILBOX_DIR.mkdir(parents=True, exist_ok=True)
+    items = []
+    for path in sorted(MAILBOX_DIR.glob("*.json"), reverse=True):
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        items.append({"filename": path.name, **data})
+    return items
+
 
 def main():
     """Start the Cedar PDP server."""
@@ -282,8 +436,14 @@ def main():
         print("TPE queries require policies with 'has' checks for optional context attributes")
         print()
 
-    # Start server
-    server = HTTPServer(('localhost', port), CedarPDPHandler)
+    MAILBOX_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Start server (threaded so long-poll waits do not block the approver UI)
+    server = ThreadingPDPServer(('localhost', port), CedarPDPHandler)
+    accept_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    accept_thread.start()
+    sys.stderr.write("Cedar PDP listening on http://localhost:{}\n".format(port))
+    sys.stderr.flush()
 
     print("=" * 70)
     print("Cedar PDP Server for OpenClaw Authorization")
@@ -295,11 +455,17 @@ def main():
         print("TPE Policies: {}".format(POLICIES_TPE.relative_to(REPO_ROOT)))
     if POLICIES_DELEGATION.exists():
         print("Delegation: {}".format(POLICIES_DELEGATION.relative_to(REPO_ROOT)))
+    if POLICIES_HITL.exists():
+        print("HITL:       {}".format(POLICIES_HITL.relative_to(REPO_ROOT)))
     print("Entities:   {}".format(ENTITIES.relative_to(REPO_ROOT)))
+    if WEBAUTHN is None:
+        print()
+        print("Note: pip3 install webauthn  (required for /approver Yubikey flows)")
     print()
     print("Endpoints:")
     print("  POST /authorize          - Authorization requests (reactive)")
     print("  POST /query-constraints  - TPE constraint queries (proactive)")
+    print("  GET  /approver           - Human-in-the-loop Yubikey page")
     print("  GET  /health             - Health check")
     print()
     print("Ready to authorize tool executions...")
@@ -307,7 +473,7 @@ def main():
     print()
 
     try:
-        server.serve_forever()
+        accept_thread.join()
     except KeyboardInterrupt:
         print("\nShutting down...")
         server.shutdown()

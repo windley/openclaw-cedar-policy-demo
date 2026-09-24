@@ -1,11 +1,19 @@
-import type { AnyAgentTool } from "./tools/common.js";
 import type { OpenClawConfig } from "../config/config.js";
+import type { AnyAgentTool } from "./tools/common.js";
 import { authorizeTool } from "../authz/cedar-pdp-client.js";
 import {
   getDelegation,
   isDelegationExpired,
   isSubagentSessionKey,
 } from "../authz/delegation-store.js";
+import {
+  createPendingApproval,
+  computeSendRequestHash,
+  isSendEmailTool,
+  resolveHitlEndpoint,
+  waitForApproval,
+  type HumanApproval,
+} from "../authz/hitl-client.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { normalizeToolName } from "./tool-policy.js";
@@ -22,6 +30,111 @@ const log = createSubsystemLogger("agents/tools");
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readEmailFields(params: Record<string, unknown>): {
+  to: string;
+  subject: string;
+  body: string;
+} {
+  return {
+    to: typeof params.to === "string" ? params.to : "",
+    subject: typeof params.subject === "string" ? params.subject : "",
+    body: typeof params.body === "string" ? params.body : "",
+  };
+}
+
+async function maybeWaitForHitl(args: {
+  toolName: string;
+  email?: { to: string; subject: string; body: string };
+  requestHash?: string;
+  decisionReason?: string;
+  pdpConfig: {
+    endpoint?: string;
+    timeoutMs?: number;
+    failOpen?: boolean;
+    hitlEndpoint?: string;
+    hitlTimeoutMs?: number;
+  };
+  agentId?: string;
+  toolCallId?: string;
+  isSubAgent: boolean;
+  delegation?: {
+    isDelegated: boolean;
+    delegatedActions: string[];
+    delegatedPathPattern?: string;
+    delegatedCommandPattern?: string;
+  };
+  params: Record<string, unknown>;
+}): Promise<{ allowed: boolean; reason?: string }> {
+  const hitlEndpoint = resolveHitlEndpoint(args.pdpConfig);
+  if (!isSendEmailTool(args.toolName) || !hitlEndpoint || !args.email || !args.requestHash) {
+    log.info(
+      `HITL skip park: tool=${args.toolName} hitlEndpoint=${hitlEndpoint ?? "unset"} hasEmail=${Boolean(args.email)} hasHash=${Boolean(args.requestHash)}`,
+    );
+    return {
+      allowed: false,
+      reason: args.decisionReason || "Tool execution denied by authorization policy",
+    };
+  }
+
+  const timeoutMs = args.pdpConfig.hitlTimeoutMs ?? 180_000;
+  log.info(`HITL parking send_email to=${args.email.to} timeoutMs=${timeoutMs}`);
+
+  try {
+    const pending = await createPendingApproval(hitlEndpoint, {
+      to: args.email.to,
+      subject: args.email.subject,
+      body: args.email.body,
+      requestHash: args.requestHash,
+      agentId: args.agentId,
+      toolCallId: args.toolCallId,
+      timeoutMs,
+    });
+    const approval: HumanApproval | null = await waitForApproval(
+      hitlEndpoint,
+      pending.id,
+      timeoutMs,
+    );
+    if (!approval) {
+      return {
+        allowed: false,
+        reason: "Human approval timed out — send denied",
+      };
+    }
+
+    const retry = await authorizeTool(
+      {
+        toolName: args.toolName,
+        params: args.params,
+        toolCallId: args.toolCallId,
+        agentId: args.agentId,
+        isSubAgent: args.isSubAgent,
+        delegation: args.delegation,
+        email: args.email,
+        requestHash: args.requestHash,
+        humanApproval: approval,
+      },
+      {
+        endpoint: args.pdpConfig.endpoint ?? "",
+        timeoutMs: args.pdpConfig.timeoutMs,
+        failOpen: args.pdpConfig.failOpen,
+      },
+    );
+    if (!retry.allowed) {
+      return {
+        allowed: false,
+        reason: retry.reason || "Send denied after human approval",
+      };
+    }
+    return { allowed: true };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return {
+      allowed: false,
+      reason: `Human approval failed: ${errorMsg}`,
+    };
+  }
 }
 
 export async function runBeforeToolCallHook(args: {
@@ -43,12 +156,14 @@ export async function runBeforeToolCallHook(args: {
       const isSubAgent = isSubagentSessionKey(sessionKey);
 
       // For subagents: check delegation before calling PDP
-      let delegation: {
-        isDelegated: boolean;
-        delegatedActions: string[];
-        delegatedPathPattern?: string;
-        delegatedCommandPattern?: string;
-      } | undefined;
+      let delegation:
+        | {
+            isDelegated: boolean;
+            delegatedActions: string[];
+            delegatedPathPattern?: string;
+            delegatedCommandPattern?: string;
+          }
+        | undefined;
 
       if (isSubAgent) {
         const record = getDelegation(sessionKey);
@@ -87,15 +202,26 @@ export async function runBeforeToolCallHook(args: {
         };
       }
 
+      const authzParams = isPlainObject(params) ? params : {};
+      const email = isSendEmailTool(toolName) ? readEmailFields(authzParams) : undefined;
+      const requestHash = email
+        ? computeSendRequestHash({
+            ...email,
+            toolCallId: args.toolCallId || "unknown",
+          })
+        : undefined;
+
       const decision = await authorizeTool(
         {
           toolName,
-          params: isPlainObject(params) ? params : {},
+          params: authzParams,
           toolCallId: args.toolCallId,
           agentId: args.ctx?.agentId,
           sessionKey: args.ctx?.sessionKey,
           isSubAgent,
           delegation,
+          email,
+          requestHash,
         },
         {
           endpoint: pdpConfig.endpoint,
@@ -105,10 +231,24 @@ export async function runBeforeToolCallHook(args: {
       );
 
       if (!decision.allowed) {
-        return {
-          blocked: true,
-          reason: decision.reason || "Tool execution denied by authorization policy",
-        };
+        const hitlDecision = await maybeWaitForHitl({
+          toolName,
+          email,
+          requestHash,
+          decisionReason: decision.reason,
+          pdpConfig,
+          agentId: args.ctx?.agentId,
+          toolCallId: args.toolCallId,
+          isSubAgent,
+          delegation,
+          params: authzParams,
+        });
+        if (!hitlDecision.allowed) {
+          return {
+            blocked: true,
+            reason: hitlDecision.reason || "Tool execution denied by authorization policy",
+          };
+        }
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);

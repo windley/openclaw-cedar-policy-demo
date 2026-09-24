@@ -149,5 +149,16 @@
       "riskLevel": "medium"
     },
     "parents": []
+  },
+  {
+    "uid": {
+      "type": "OpenClaw::Tool",
+      "id": "send_email"
+    },
+    "attrs": {
+      "category": "communication",
+      "riskLevel": "critical"
+    },
+    "parents": []
   }
 ]

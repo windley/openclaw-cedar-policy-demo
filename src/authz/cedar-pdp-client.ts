@@ -75,6 +75,20 @@ export type ToolAuthzContext = {
   };
   /** If true, use SubAgent principal type instead of Agent */
   isSubAgent?: boolean;
+  /** Simulated email fields for send_email */
+  email?: {
+    to: string;
+    subject: string;
+    body: string;
+  };
+  /** Hash of the send being authorized */
+  requestHash?: string;
+  /** Verified human approval injected by the PEP after WebAuthn */
+  humanApproval?: {
+    verified: boolean;
+    method: string;
+    requestHash: string;
+  };
 };
 
 /**
@@ -144,6 +158,20 @@ function buildContext(ctx: ToolAuthzContext): Record<string, unknown> {
     if (ctx.delegation.delegatedCommandPattern) {
       context.delegatedCommandPattern = ctx.delegation.delegatedCommandPattern;
     }
+  }
+
+  if (ctx.email) {
+    context.emailTo = ctx.email.to;
+    context.emailSubject = ctx.email.subject;
+    context.emailBody = ctx.email.body;
+  }
+
+  if (ctx.requestHash) {
+    context.requestHash = ctx.requestHash;
+  }
+
+  if (ctx.humanApproval) {
+    context.humanApproval = ctx.humanApproval;
   }
 
   return context;
